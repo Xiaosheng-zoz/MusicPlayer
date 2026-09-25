@@ -13,7 +13,8 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'spikes/IosProbe/**'
+      - 'spikes/IosProbe/**'      # .NET 版探针
+      - 'spikes/FlacProbe/**'     # Swift 版探针（之前漏了，导致只改它时不触发）
       - '.github/workflows/ios-probe.yml'
 
 jobs:
