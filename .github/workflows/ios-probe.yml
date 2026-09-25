@@ -111,14 +111,17 @@ jobs:
             -p:RuntimeIdentifier="$RID" 2>&1 | tee build.log
           status=${PIPESTATUS[0]}
 
-          # 把编译错误转成 GitHub 注解。注解未登录也能通过 API 读到，
-          # 而作业日志下载需要登录——这样排查就不用每次都靠人工复制日志。
-          echo "--- 编译错误摘要 ---"
-          grep -E 'error [A-Z]{2,}[0-9]+' build.log | sort -u | head -30 > errors.txt || true
-          cat errors.txt
+          # 把编译输出的结尾发成 GitHub 注解。注解未登录也能通过 API 读到，
+          # 而作业日志下载需要登录——这样排查就不用每次靠人工复制日志。
+          #
+          # 不按模式过滤：上一版用 grep 只匹配 error CSxxxx，结果一条都没中，
+          # 因为失败未必是 C# 编译错误——工具链错误就是没有错误码的（形如 "error :"）。
+          echo "--- 编译输出结尾 25 行 ---"
+          tail -25 build.log
           while IFS= read -r line; do
+            line=${line//'%'/'%25'}
             [ -n "$line" ] && echo "::error::${line}"
-          done < errors.txt
+          done < <(tail -25 build.log)
 
           exit "$status"
 

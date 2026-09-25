@@ -47,15 +47,19 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<!--
-		  刻意去掉了 MauiIcon / MauiImage / MauiSplashScreen：
-		  它们会让 MAUI 生成资源目录，进而调用 actool。而 CI 镜像上的
-		  Xcode 26.6 调用 actool 时报 errno=Invalid argument（actool 本身是存在的，
-		  是那次查找调用出了问题）。
+		<!-- App Icon。
+		    曾经为了绕开 actool 把这三项去掉过，结果编译反而更早地失败了
+		     （去掉图标是唯一改动，而此前同一套流程已经能编译到我们的代码）。
+		     actool 的真实原因是新选中的 Xcode 需要 runFirstLaunch，
+		     工作流里已经补上那一步，所以图标可以正常使用。 -->
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
 
-		  探针要回答的是"iOS 能不能播 24/96 FLAC"，跟图标毫无关系。
-		  所以这里先绕开这个工具链问题——图标等主应用做 iOS 端时再单独解决。
-		-->
+		<!-- Splash Screen -->
+		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+
+		<!-- Images -->
+		<MauiImage Include="Resources\Images\*" />
+		<MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
 
 		<!-- Custom Fonts -->
 		<MauiFont Include="Resources\Fonts\*" />
