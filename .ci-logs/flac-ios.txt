@@ -1,0 +1,8 @@
+=== FLAC 解码探针（Swift + AVFoundation）===
+运行平台: Version 26.4.1 (Build 23E254a)
+样本: sample-24bit96k.flac  6.22 MB
+[1] AVAsset 解析成功：时长 20.05 秒，音频轨 1 条
+[2] AVAudioFile 打开成功：文件格式 96000.0 Hz / 2 ch / 0 bit
+      实际解码 96000 帧 —— 解码器确实在工作
+结论: PASS
+com.xszoz.flacprobe: 3542

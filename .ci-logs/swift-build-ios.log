@@ -1,0 +1,17 @@
+spikes/FlacProbe/main.swift:41:20: warning: 'tracks(withMediaType:)' was deprecated in iOS 16.0: Use loadTracks(withMediaType:) instead [#DeprecatedDeclaration]
+39 | // 1. 容器与轨道信息
+40 | let asset = AVURLAsset(url: url)
+41 | let tracks = asset.tracks(withMediaType: .audio)
+   |                    `- warning: 'tracks(withMediaType:)' was deprecated in iOS 16.0: Use loadTracks(withMediaType:) instead [#DeprecatedDeclaration]
+42 | guard let track = tracks.first else {
+43 |     fail("[1] 失败：AVAsset 里没有音频轨（连容器都不认）")
+
+spikes/FlacProbe/main.swift:45:73: warning: 'duration' was deprecated in iOS 16.0: Use load(.duration) instead [#DeprecatedDeclaration]
+43 |     fail("[1] 失败：AVAsset 里没有音频轨（连容器都不认）")
+44 | }
+45 | print("[1] AVAsset 解析成功：时长 \(String(format: "%.2f", asset.duration.seconds)) 秒，音频轨 \(tracks.count) 条")
+   |                                                           `- warning: 'duration' was deprecated in iOS 16.0: Use load(.duration) instead [#DeprecatedDeclaration]
+46 | 
+47 | // 这里本来还会打印轨道的采样率/位深，但 AVAssetTrack.formatDescriptions 的元素是 Any，
+
+[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
