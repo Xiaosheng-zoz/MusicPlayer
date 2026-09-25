@@ -1,0 +1,28 @@
+XCODE_DEV_DIR = /Applications/Xcode_26.6.0.app/Contents/Developer
+SDK 路径     = /Applications/Xcode_26.6.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+drwxr-xr-x  7 runner  staff  224 Sep  7 05:14 /Applications/Xcode_26.6.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+total 0
+drwxr-xr-x  7 runner  staff  224 Sep  7 05:14 MacOSX.sdk
+lrwxr-xr-x  1 runner  staff   10 Sep  7 05:13 MacOSX26.5.sdk -> MacOSX.sdk
+lrwxr-xr-x  1 runner  staff   10 Sep  7 05:13 MacOSX26.sdk -> MacOSX.sdk
+
+### 原样复现：xcodebuild -sdk <macosx> -find actool
+/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/actool
+exit=0
+
+### 变体
+/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/actool
+  exit=0
+/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/actool
+  exit=0
+/Applications/Xcode_26.6.app/Contents/Developer/usr/bin/actool
+  exit=0
+/Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/install_name_tool
+  exit=0
+ls: /Applications/Xcode_26.6.0.app/Contents/Developer/usr/bin/install_name_tool: No such file or directory
+-rwxr-xr-x  1 runner  staff  174384 Sep  7 05:14 /Applications/Xcode_26.6.0.app/Contents/Developer/usr/bin/actool
+
+### 环境
+DEVELOPER_DIR=<未设置>
+PATH=/Users/runner/.dotnet:/opt/homebrew/lib/ruby/gems/3.4.0/bin:/opt/homebrew/opt/ruby@3.4/bin:/Users/runner/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/runner/.cargo/bin:/usr/local/opt/curl/bin:/usr/local/bin:/usr/local/sbin:/Users/runner/bin:/Users/runner/.yarn/bin:/Users/runner/Library/Android/sdk/tools:/Users/runner/Library/Android/sdk/platform-tools:/Library/Frameworks/Python.framework/Versions/Current/bin:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/usr/bin:/bin:/usr/sbin:/sbin:/Users/runner/.dotnet/tools
+xcode-select -p = /Applications/Xcode_26.6.0.app/Contents/Developer
