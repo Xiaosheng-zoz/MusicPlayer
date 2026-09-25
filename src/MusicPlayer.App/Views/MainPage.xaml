@@ -116,11 +116,11 @@
         </HorizontalStackLayout>
 
         <HorizontalStackLayout Grid.Column="1" Spacing="13" VerticalOptions="Center">
-          <Button Text="◀◀" Clicked="OnPreviousClicked" BackgroundColor="Transparent" TextColor="#5B6270" FontSize="11" Padding="0" WidthRequest="28" />
+          <Button Text="⏮" Clicked="OnPreviousClicked" BackgroundColor="Transparent" TextColor="#5B6270" FontSize="14" Padding="0" WidthRequest="28" />
           <Button x:Name="PlayPauseButton" Text="▶" Clicked="OnPlayPauseClicked"
                   BackgroundColor="#2F6FED" TextColor="#FFFFFF" FontSize="12"
                   WidthRequest="34" HeightRequest="34" CornerRadius="17" Padding="0" />
-          <Button Text="▶▶" Clicked="OnNextClicked" BackgroundColor="Transparent" TextColor="#5B6270" FontSize="11" Padding="0" WidthRequest="28" />
+          <Button Text="⏭" Clicked="OnNextClicked" BackgroundColor="Transparent" TextColor="#5B6270" FontSize="14" Padding="0" WidthRequest="28" />
         </HorizontalStackLayout>
 
         <Grid Grid.Column="2" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="9" VerticalOptions="Center">
