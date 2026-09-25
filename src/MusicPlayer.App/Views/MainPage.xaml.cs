@@ -21,9 +21,15 @@ public partial class MainPage : ContentPage
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         SizeChanged += OnSizeChanged;
 
+        Loaded += async (_, _) => await OnPageLoadedAsync();
+    }
+
+    private async Task OnPageLoadedAsync()
+    {
 #if WINDOWS
-        Loaded += (_, _) => HookSpaceKey();
+        HookSpaceKey();
 #endif
+        await _viewModel.InitializeCommand.ExecuteAsync(null);
     }
 
     private async void OnChooseFolderClicked(object? sender, EventArgs e)

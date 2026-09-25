@@ -17,20 +17,22 @@ public sealed class LibraryLoader
             return new LibraryLoadResult(
                 Array.Empty<Models.Track>(),
                 "请选择音乐文件夹",
-                "点「浏览」选一个文件夹，或直接把路径粘贴到输入框里");
+                "点「浏览」选一个文件夹，或直接把路径粘贴到输入框里",
+                FolderExists: false);
         }
 
         var path = folderPath.Trim();
 
         if (!Directory.Exists(path))
         {
-            return new LibraryLoadResult(Array.Empty<Models.Track>(), "这个路径不存在", path);
+            return new LibraryLoadResult(
+                Array.Empty<Models.Track>(), "这个路径不存在", path, FolderExists: false);
         }
 
         var tracks = await _scanner.ScanAsync(path, cancellationToken);
 
         return tracks.Count == 0
-            ? new LibraryLoadResult(tracks, "这个文件夹里没有 MP3 或 FLAC", path)
-            : new LibraryLoadResult(tracks, "全部歌曲", $"{tracks.Count} 首 · {path}");
+            ? new LibraryLoadResult(tracks, "这个文件夹里没有 MP3 或 FLAC", path, FolderExists: true)
+            : new LibraryLoadResult(tracks, "全部歌曲", $"{tracks.Count} 首 · {path}", FolderExists: true);
     }
 }

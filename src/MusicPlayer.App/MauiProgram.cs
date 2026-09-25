@@ -5,6 +5,7 @@ using MusicPlayer.App.ViewModels;
 using MusicPlayer.App.Views;
 using MusicPlayer.Core.Library;
 using MusicPlayer.Core.Metadata;
+using MusicPlayer.Core.Settings;
 
 namespace MusicPlayer.App;
 
@@ -30,6 +31,12 @@ public static class MauiProgram
 		builder.Services.AddSingleton<LibraryLoader>();
 		builder.Services.AddSingleton<PlayerViewModel>();
 		builder.Services.AddSingleton<MainPage>();
+
+		var settingsPath = Path.Combine(
+			Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+			"MusicPlayer",
+			"settings.json");
+		builder.Services.AddSingleton<IAppSettingsStore>(new JsonAppSettingsStore(settingsPath));
 
 #if DEBUG
 		builder.Logging.AddDebug();

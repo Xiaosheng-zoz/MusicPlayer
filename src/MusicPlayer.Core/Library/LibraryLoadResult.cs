@@ -6,4 +6,5 @@ namespace MusicPlayer.Core.Library;
 public sealed record LibraryLoadResult(
     IReadOnlyList<Track> Tracks,
     string StatusMessage,
-    string StatusDetail);
+    string StatusDetail,
+    bool FolderExists);

@@ -8,6 +8,7 @@ using MusicPlayer.Core.Library;
 using MusicPlayer.Core.Metadata;
 using MusicPlayer.Core.Models;
 using MusicPlayer.Core.Playback;
+using MusicPlayer.Core.Settings;
 
 namespace MusicPlayer.App.ViewModels;
 
@@ -68,14 +69,16 @@ public sealed partial class PlayerViewModel : ObservableObject
 {
     private readonly LibraryLoader _loader;
     private readonly ICoverArtReader _coverArt;
+    private readonly IAppSettingsStore _settings;
     private PlaybackController? _controller;
     private bool _isDraggingProgress;
     private string _nowCoverPath = string.Empty;
 
-    public PlayerViewModel(LibraryLoader loader, ICoverArtReader coverArt)
+    public PlayerViewModel(LibraryLoader loader, ICoverArtReader coverArt, IAppSettingsStore settings)
     {
         _loader = loader;
         _coverArt = coverArt;
+        _settings = settings;
         FolderPath = string.Empty;
         StatusMessage = "还没有音乐";
         StatusDetail = "点「浏览」选一个文件夹，或直接把路径粘贴到输入框里";
@@ -122,6 +125,20 @@ public sealed partial class PlayerViewModel : ObservableObject
     };
 
     public bool IsEmpty => !HasTracks && !IsBusy;
+
+    /// <summary>启动时自动打开上次用过的文件夹。</summary>
+    [RelayCommand]
+    private async Task InitializeAsync()
+    {
+        var lastFolder = _settings.LoadLastFolder();
+        if (string.IsNullOrWhiteSpace(lastFolder))
+        {
+            return;
+        }
+
+        FolderPath = lastFolder;
+        await LoadFolderAsync(lastFolder);
+    }
 
     /// <summary>MediaElement 必须先存在于视觉树里，所以播放器由页面构造好再注入进来。</summary>
     public void AttachPlayer(IAudioPlayer player)
@@ -208,6 +225,12 @@ public sealed partial class PlayerViewModel : ObservableObject
             HasTracks = Tracks.Count > 0;
             StatusMessage = result.StatusMessage;
             StatusDetail = result.StatusDetail;
+
+            // 只记住真实存在的文件夹：路径打错不该被记下来，否则下次启动就自动报错
+            if (result.FolderExists && path is not null)
+            {
+                _settings.SaveLastFolder(path);
+            }
         }
         finally
         {

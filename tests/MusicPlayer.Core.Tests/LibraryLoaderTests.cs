@@ -66,4 +66,30 @@ public class LibraryLoaderTests : IDisposable
         Assert.Equal("全部歌曲", result.StatusMessage);
         Assert.Contains("2", result.StatusDetail);
     }
+
+    [Fact]
+    public async Task LoadAsync_WithExistingFolder_ReportsFolderExists()
+    {
+        File.WriteAllText(Path.Combine(_root, "a.flac"), "x");
+
+        var result = await CreateLoader().LoadAsync(_root);
+
+        Assert.True(result.FolderExists);
+    }
+
+    [Fact]
+    public async Task LoadAsync_WithMissingPath_ReportsFolderMissing()
+    {
+        var result = await CreateLoader().LoadAsync(Path.Combine(_root, "no-such-folder"));
+
+        Assert.False(result.FolderExists);
+    }
+
+    [Fact]
+    public async Task LoadAsync_WithNoPath_ReportsFolderMissing()
+    {
+        var result = await CreateLoader().LoadAsync("  ");
+
+        Assert.False(result.FolderExists);
+    }
 }
