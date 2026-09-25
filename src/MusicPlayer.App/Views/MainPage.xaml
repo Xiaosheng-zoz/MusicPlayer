@@ -56,14 +56,12 @@
       <CollectionView Grid.Row="1" ItemsSource="{Binding Tracks}" SelectionMode="None" Margin="8,0">
         <CollectionView.ItemTemplate>
           <DataTemplate x:DataType="vm:TrackItem">
-            <Grid Padding="10,0" HeightRequest="50" ColumnDefinitions="34,*,48" ColumnSpacing="11">
-              <Grid.Triggers>
-                <DataTrigger TargetType="Grid" Binding="{Binding IsCurrent}" Value="True">
-                  <Setter Property="BackgroundColor" Value="#E7EEFC" />
-                </DataTrigger>
-              </Grid.Triggers>
+            <Grid Padding="6,0,10,0" HeightRequest="50" ColumnDefinitions="30,34,*,48" ColumnSpacing="9"
+                  BackgroundColor="{Binding RowColor}">
+              <Label Grid.Column="0" Text="{Binding Number}" FontSize="10.5" TextColor="#9AA1AF"
+                     VerticalOptions="Center" HorizontalTextAlignment="End" />
 
-              <Border Grid.Column="0" WidthRequest="34" HeightRequest="34" StrokeThickness="0"
+              <Border Grid.Column="1" WidthRequest="34" HeightRequest="34" StrokeThickness="0"
                       BackgroundColor="#9DBCF7">
                 <Border.StrokeShape>
                   <RoundRectangle CornerRadius="6" />
@@ -71,18 +69,19 @@
                 <Image Source="{Binding Cover}" Aspect="AspectFill" />
               </Border>
 
-              <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="1">
+              <VerticalStackLayout Grid.Column="2" VerticalOptions="Center" Spacing="1">
                 <Label Text="{Binding Title}" FontSize="12" FontAttributes="Bold" TextColor="#1B1D22" LineBreakMode="TailTruncation" />
                 <Label Text="{Binding Subtitle}" FontSize="10.5" TextColor="#8B93A2" LineBreakMode="TailTruncation" />
               </VerticalStackLayout>
 
-              <Label Grid.Column="2" Text="{Binding Duration}" FontSize="11" TextColor="#8B93A2"
+              <Label Grid.Column="3" Text="{Binding Duration}" FontSize="11" TextColor="#8B93A2"
                      VerticalOptions="Center" HorizontalTextAlignment="End" />
 
               <Grid.GestureRecognizers>
                 <TapGestureRecognizer
                     Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.PlayTrackCommand}"
                     CommandParameter="{Binding .}" />
+                <PointerGestureRecognizer PointerEntered="OnRowPointerEntered" PointerExited="OnRowPointerExited" />
               </Grid.GestureRecognizers>
             </Grid>
           </DataTemplate>

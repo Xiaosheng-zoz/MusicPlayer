@@ -12,9 +12,14 @@ namespace MusicPlayer.App.ViewModels;
 
 public sealed partial class TrackItem : ObservableObject
 {
-    public TrackItem(Track track) => Track = track;
+    public TrackItem(Track track, int number)
+    {
+        Track = track;
+        Number = number;
+    }
 
     public Track Track { get; }
+    public int Number { get; }
     public string Title => Track.DisplayTitle;
     public string Subtitle => Track.DisplaySubtitle;
     public string Duration => Track.DisplayDuration;
@@ -25,7 +30,19 @@ public sealed partial class TrackItem : ObservableObject
         : null;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RowColor))]
     public partial bool IsCurrent { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RowColor))]
+    public partial bool IsHovered { get; set; }
+
+    /// <summary>行底色。正在播放优先于鼠标悬停，其余透明。</summary>
+    public Color RowColor => IsCurrent
+        ? Color.FromArgb("#E7EEFC")
+        : IsHovered
+            ? Color.FromArgb("#EFF3F8")
+            : Colors.White;
 }
 
 public sealed partial class PlayerViewModel : ObservableObject
@@ -139,7 +156,7 @@ public sealed partial class PlayerViewModel : ObservableObject
             Tracks.Clear();
             foreach (var track in result.Tracks)
             {
-                Tracks.Add(new TrackItem(track));
+                Tracks.Add(new TrackItem(track, Tracks.Count + 1));
             }
 
             _controller?.LoadTracks(result.Tracks);
@@ -161,11 +178,6 @@ public sealed partial class PlayerViewModel : ObservableObject
             return;
         }
 
-        foreach (var track in Tracks)
-        {
-            track.IsCurrent = ReferenceEquals(track, item);
-        }
-
         RefreshTransport();
     }
 
@@ -179,22 +191,14 @@ public sealed partial class PlayerViewModel : ObservableObject
     [RelayCommand]
     private void Next()
     {
-        if (_controller?.Next() == true)
-        {
-            MarkCurrent();
-        }
-
+        _controller?.Next();
         RefreshTransport();
     }
 
     [RelayCommand]
     private void Previous()
     {
-        if (_controller?.Previous() == true)
-        {
-            MarkCurrent();
-        }
-
+        _controller?.Previous();
         RefreshTransport();
     }
 
@@ -233,12 +237,17 @@ public sealed partial class PlayerViewModel : ObservableObject
                     + $"field DurationSeconds={DurationSeconds}, "
                     + $"title={current?.DisplayTitle ?? "<null>"}");
         NowTitle = current?.DisplayTitle ?? string.Empty;
-        NowSubtitle = current is null ? string.Empty : $"{current.DisplayArtist} · {current.DisplayAlbum}";
+        // 播放条只显示歌名和歌手，不显示专辑
+        NowSubtitle = current?.DisplayArtist ?? string.Empty;
         IsPlaying = _controller?.State == PlaybackState.Playing;
         DurationSeconds = durationSeconds;
         PositionSeconds = _controller?.Position.TotalSeconds ?? 0;
         NowCover = current?.CoverArt is { Length: > 0 } bytes
             ? ImageSource.FromStream(() => new MemoryStream(bytes))
             : null;
+
+        // 放在这里而不是只在上一首/下一首命令里：自动切歌也走这条路，
+        // 否则播完自动下一首时列表高亮会停在上一首。
+        MarkCurrent();
     }
 }

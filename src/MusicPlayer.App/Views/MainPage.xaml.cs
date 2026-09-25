@@ -41,6 +41,22 @@ public partial class MainPage : ContentPage
 
     private void OnVolumeChanged(object? sender, ValueChangedEventArgs e) => _viewModel.SetVolume(e.NewValue);
 
+    private void OnRowPointerEntered(object? sender, PointerEventArgs e) => SetRowHovered(sender, true);
+
+    private void OnRowPointerExited(object? sender, PointerEventArgs e) => SetRowHovered(sender, false);
+
+    /// <summary>手势识别器的 BindingContext 继承自它所在的那一行。</summary>
+    private static void SetRowHovered(object? sender, bool hovered)
+    {
+        var item = (sender as BindableObject)?.BindingContext as TrackItem
+                   ?? (sender as Element)?.Parent?.BindingContext as TrackItem;
+
+        if (item is not null)
+        {
+            item.IsHovered = hovered;
+        }
+    }
+
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         try
