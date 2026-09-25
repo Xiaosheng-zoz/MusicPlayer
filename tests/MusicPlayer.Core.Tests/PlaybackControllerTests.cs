@@ -13,6 +13,10 @@ public class PlaybackControllerTests
         new Track { FilePath = @"C:\m\3.flac" }
     };
 
+    private static List<Track> TenTracks() => Enumerable.Range(1, 10)
+        .Select(i => new Track { FilePath = $@"C:\m\{i}.flac" })
+        .ToList();
+
     [Fact]
     public void PlayAt_LoadsThenPlays()
     {
@@ -52,7 +56,7 @@ public class PlaybackControllerTests
     }
 
     [Fact]
-    public void Ended_OnLastTrack_StopsPlayback()
+    public void Ended_OnLastTrack_InSequentialMode_WrapsToTheFirstTrack()
     {
         var player = new FakeAudioPlayer();
         var controller = new PlaybackController(player);
@@ -61,8 +65,102 @@ public class PlaybackControllerTests
 
         player.SimulateEnded();
 
-        Assert.Equal(PlaybackState.Stopped, controller.State);
-        Assert.Equal(@"C:\m\3.flac", controller.Current!.FilePath);
+        // 顺序播放是列表循环：放完最后一首回到第一首继续，不再停下
+        Assert.Equal(@"C:\m\1.flac", controller.Current!.FilePath);
+        Assert.Equal(PlaybackState.Playing, controller.State);
+    }
+
+    [Fact]
+    public void Next_OnLastTrack_InSequentialMode_WrapsToTheFirstTrack()
+    {
+        var player = new FakeAudioPlayer();
+        var controller = new PlaybackController(player);
+        controller.LoadTracks(ThreeTracks());
+        controller.PlayAt(2);
+
+        Assert.True(controller.Next());
+
+        Assert.Equal(@"C:\m\1.flac", controller.Current!.FilePath);
+        Assert.Equal(PlaybackState.Playing, controller.State);
+    }
+
+    [Fact]
+    public void Shuffle_PlaysEveryTrackOnceBeforeRepeatingAny()
+    {
+        var player = new FakeAudioPlayer();
+        var controller = new PlaybackController(player);
+        controller.LoadTracks(TenTracks());
+        controller.Mode = PlayMode.Shuffle;
+        controller.PlayAt(0);
+
+        var played = new List<string> { controller.Current!.FilePath };
+        for (var i = 0; i < 9; i++)
+        {
+            controller.Next();
+            played.Add(controller.Current!.FilePath);
+        }
+
+        Assert.Equal(10, played.Distinct().Count());
+    }
+
+    [Fact]
+    public void Shuffle_ManuallyPickedTrackIsNotReplayedInTheSameRound()
+    {
+        var player = new FakeAudioPlayer();
+        var controller = new PlaybackController(player);
+        controller.LoadTracks(TenTracks());
+        controller.Mode = PlayMode.Shuffle;
+
+        controller.PlayAt(2); // 手动点第 3 首，它也算本轮已播
+
+        var played = new List<string> { controller.Current!.FilePath };
+        for (var i = 0; i < 9; i++)
+        {
+            controller.Next();
+            played.Add(controller.Current!.FilePath);
+        }
+
+        Assert.Equal(10, played.Distinct().Count());
+    }
+
+    [Fact]
+    public void Shuffle_NewRoundDoesNotStartWithTheTrackThatJustPlayed()
+    {
+        var player = new FakeAudioPlayer();
+        var controller = new PlaybackController(player);
+        controller.LoadTracks(TenTracks());
+        controller.Mode = PlayMode.Shuffle;
+        controller.PlayAt(0);
+
+        for (var round = 0; round < 5; round++)
+        {
+            var lastOfRound = string.Empty;
+            for (var i = 0; i < 10; i++)
+            {
+                lastOfRound = controller.Current!.FilePath;
+                controller.Next();
+            }
+
+            Assert.NotEqual(lastOfRound, controller.Current!.FilePath);
+        }
+    }
+
+    [Fact]
+    public void Shuffle_Previous_ReturnsToTheTrackThatPlayedBefore()
+    {
+        var player = new FakeAudioPlayer();
+        var controller = new PlaybackController(player);
+        controller.LoadTracks(TenTracks());
+        controller.Mode = PlayMode.Shuffle;
+        controller.PlayAt(0);
+        var first = controller.Current!.FilePath;
+        controller.Next();
+        var second = controller.Current!.FilePath;
+
+        controller.Previous();
+
+        Assert.Equal(first, controller.Current!.FilePath);
+        Assert.NotEqual(second, controller.Current!.FilePath);
     }
 
     [Fact]

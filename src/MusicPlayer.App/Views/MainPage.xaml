@@ -132,7 +132,7 @@
 
         <Button Grid.Column="3" Text="{Binding PlayModeGlyph}" Clicked="OnPlayModeClicked"
                 ToolTipProperties.Text="{Binding PlayModeTooltip}"
-                BackgroundColor="Transparent" TextColor="#5B6270" BorderColor="#D8DEE9" BorderWidth="1"
+                BackgroundColor="Transparent" TextColor="#5B6270" BorderWidth="0"
                 FontSize="13" CornerRadius="6" Padding="6,2" HeightRequest="30" MinimumWidthRequest="42"
                 VerticalOptions="Center" />
 

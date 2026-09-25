@@ -7,8 +7,9 @@ public sealed class PlaybackController
 {
     private readonly PlaybackQueue _queue = new();
     private readonly IAudioPlayer _player;
-    private readonly Func<int, int> _pickIndex;
+    private readonly ShuffleBag _shuffleBag;
     private int _failedAttempts;
+    private PlayMode _mode = PlayMode.Sequential;
     private bool _isTryingCurrent;
     private bool _loadFailed;
     private string _failureMessage = string.Empty;
@@ -17,7 +18,7 @@ public sealed class PlaybackController
     public PlaybackController(IAudioPlayer player, Func<int, int>? pickIndex = null)
     {
         _player = player;
-        _pickIndex = pickIndex ?? (maxExclusive => Random.Shared.Next(maxExclusive));
+        _shuffleBag = new ShuffleBag(pickIndex);
         _player.Ended += OnEnded;
         _player.Failed += OnFailed;
         _player.PositionChanged += (_, _) => PositionChanged?.Invoke(this, _player.Position);
@@ -34,7 +35,20 @@ public sealed class PlaybackController
     public Track? Current => _queue.Current;
 
     /// <summary>播放方式：顺序 / 随机 / 单曲循环。</summary>
-    public PlayMode Mode { get; set; } = PlayMode.Sequential;
+    public PlayMode Mode
+    {
+        get => _mode;
+        set
+        {
+            if (_mode == value)
+            {
+                return;
+            }
+
+            _mode = value;
+            _shuffleBag.Clear(); // 换模式就重新开一轮，避免沿用上一轮剩下的签
+        }
+    }
 
     public PlaybackState State => _player.State;
     public TimeSpan Position => _player.Position;
@@ -50,6 +64,7 @@ public sealed class PlaybackController
     {
         _queue.Replace(tracks);
         _failedAttempts = 0;
+        _shuffleBag.Clear();
     }
 
     public bool PlayAt(int index)
@@ -71,39 +86,48 @@ public sealed class PlaybackController
             return false;
         }
 
+        if (_mode == PlayMode.Shuffle)
+        {
+            // 手动点的这首也算本轮已播，本轮不会再随机到它
+            _shuffleBag.MarkPlayed(index, _queue.Tracks.Count);
+        }
+
         return TryPlayCurrentSkippingBrokenFiles();
     }
 
-    public bool Next() => Mode == PlayMode.Shuffle
-        ? MoveShuffled()
-        : _queue.MoveNext() && TryPlayCurrentSkippingBrokenFiles();
-
-    public bool Previous() => Mode == PlayMode.Shuffle
-        ? MoveShuffled()
-        : _queue.MovePrevious() && TryPlayCurrentSkippingBrokenFiles();
-
-    /// <summary>
-    /// 随机换一首。从"除当前这首之外"的曲目里挑，所以不会连着播同一首；
-    /// 列表里只有一首时只能重播它。
-    /// </summary>
-    private bool MoveShuffled()
+    public bool Next()
     {
-        var count = _queue.Tracks.Count;
-        if (count == 0)
+        if (_mode == PlayMode.Shuffle)
         {
-            return false;
+            var index = _shuffleBag.Next(_queue.Tracks.Count, _queue.CurrentIndex);
+            return index >= 0
+                && _queue.SetCurrent(index) is not null
+                && TryPlayCurrentSkippingBrokenFiles();
         }
 
-        if (count == 1)
+        // 顺序播放是列表循环：已经是最后一首就回到第一首
+        if (_queue.MoveNext())
         {
             return TryPlayCurrentSkippingBrokenFiles();
         }
 
-        var current = _queue.CurrentIndex < 0 ? 0 : _queue.CurrentIndex;
-        var offset = 1 + _pickIndex(count - 1);
-        var index = (current + offset) % count;
+        return _queue.SetCurrent(0) is not null && TryPlayCurrentSkippingBrokenFiles();
+    }
 
-        return _queue.SetCurrent(index) is not null && TryPlayCurrentSkippingBrokenFiles();
+    public bool Previous()
+    {
+        if (_mode == PlayMode.Shuffle)
+        {
+            var index = _shuffleBag.Previous(_queue.CurrentIndex);
+            if (index < 0 || index == _queue.CurrentIndex)
+            {
+                return false; // 还没有听过别的歌，没有上一首可退
+            }
+
+            return _queue.SetCurrent(index) is not null && TryPlayCurrentSkippingBrokenFiles();
+        }
+
+        return _queue.MovePrevious() && TryPlayCurrentSkippingBrokenFiles();
     }
 
     public void TogglePlayPause()
