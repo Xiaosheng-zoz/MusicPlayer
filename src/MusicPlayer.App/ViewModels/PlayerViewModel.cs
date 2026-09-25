@@ -19,6 +19,11 @@ public sealed partial class TrackItem : ObservableObject
     public string Subtitle => Track.DisplaySubtitle;
     public string Duration => Track.DisplayDuration;
 
+    /// <summary>列表行左侧的封面缩略图。没有内嵌封面时为 null，由 XAML 里的底色兜底。</summary>
+    public ImageSource? Cover => Track.CoverArt is { Length: > 0 } bytes
+        ? ImageSource.FromStream(() => new MemoryStream(bytes))
+        : null;
+
     [ObservableProperty]
     public partial bool IsCurrent { get; set; }
 }

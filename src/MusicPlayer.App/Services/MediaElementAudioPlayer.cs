@@ -11,6 +11,8 @@ namespace MusicPlayer.App.Services;
 public sealed class MediaElementAudioPlayer : IAudioPlayer
 {
     private readonly MediaElement _media;
+    private bool _playRequested;
+    private bool _autoPlayRetried;
 
     public MediaElementAudioPlayer(MediaElement media)
     {
@@ -25,6 +27,16 @@ public sealed class MediaElementAudioPlayer : IAudioPlayer
         {
             DiagLog.Write($"[media] state {e.PreviousState} -> {e.NewState}, "
                         + $"dur={_media.Duration}, pos={_media.Position}");
+
+            // Load() 之后立刻调的 Play() 会在媒体还没打开时被丢掉，媒体打开后停在 Paused。
+            // 这里补一次，每次 Load 只补一次，避免和用户手动的暂停打架。
+            if (_playRequested && !_autoPlayRetried && e.NewState == MediaElementState.Paused)
+            {
+                _autoPlayRetried = true;
+                DiagLog.Write("[media] Play 被丢弃，媒体打开后重试一次");
+                RaiseOnUiThread(() => _media.Play());
+            }
+
             RaiseOnUiThread(() => StateChanged?.Invoke(this, EventArgs.Empty));
         };
     }
@@ -67,13 +79,30 @@ public sealed class MediaElementAudioPlayer : IAudioPlayer
         _ => PlaybackState.Stopped
     };
 
-    public void Load(string filePath) => _media.Source = MediaSource.FromFile(filePath);
+    public void Load(string filePath)
+    {
+        _playRequested = false;
+        _autoPlayRetried = false;
+        _media.Source = MediaSource.FromFile(filePath);
+    }
 
-    public void Play() => _media.Play();
+    public void Play()
+    {
+        _playRequested = true;
+        _media.Play();
+    }
 
-    public void Pause() => _media.Pause();
+    public void Pause()
+    {
+        _playRequested = false;
+        _media.Pause();
+    }
 
-    public void Stop() => _media.Stop();
+    public void Stop()
+    {
+        _playRequested = false;
+        _media.Stop();
+    }
 
     public void Seek(TimeSpan position) => _media.SeekTo(position);
 }

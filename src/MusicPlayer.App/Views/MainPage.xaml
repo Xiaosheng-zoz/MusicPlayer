@@ -64,10 +64,11 @@
               </Grid.Triggers>
 
               <Border Grid.Column="0" WidthRequest="34" HeightRequest="34" StrokeThickness="0"
-                      BackgroundColor="#2F6FED" Opacity="0.45">
+                      BackgroundColor="#9DBCF7">
                 <Border.StrokeShape>
                   <RoundRectangle CornerRadius="6" />
                 </Border.StrokeShape>
+                <Image Source="{Binding Cover}" Aspect="AspectFill" />
               </Border>
 
               <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="1">
