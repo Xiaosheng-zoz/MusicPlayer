@@ -5,7 +5,7 @@
              xmlns:vm="clr-namespace:MusicPlayer.App.ViewModels"
              x:Class="MusicPlayer.App.Views.MainPage"
              x:Name="PageRoot"
-             Title="音乐播放器"
+             Title="MusicPlayer"
              BackgroundColor="#FFFFFF">
 
   <Grid ColumnDefinitions="132,*" x:Name="RootGrid">
@@ -18,11 +18,13 @@
                           ShouldAutoPlay="False"
                           ShouldShowPlaybackControls="False" />
 
-    <!-- 侧栏：音乐 / 文件夹 / 设置可用，歌单按最终形态占位但禁用 -->
-    <VerticalStackLayout Grid.Column="0" x:Name="Sidebar"
-                         BackgroundColor="#F5F6F8" Padding="8,10" Spacing="2">
+    <!-- 侧栏：音乐 / 文件夹 / 设置可用，歌单按最终形态占位但禁用。
+         用 Grid 而不是 StackLayout："设置"要靠 Padding 定位到左下、
+         并与上面三项左对齐，StackLayout 撑不到底部。 -->
+    <Grid Grid.Column="0" x:Name="Sidebar" BackgroundColor="#F5F6F8" Padding="8,10"
+          RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="2">
 
-      <Label x:Name="SideMusic" Text="♪   音乐" Padding="9,7" FontSize="11.5" TextColor="#5B6270">
+      <Label Grid.Row="0" x:Name="SideMusic" Text="♪   音乐" Padding="9,7" FontSize="11.5" TextColor="#5B6270">
         <Label.GestureRecognizers>
           <TapGestureRecognizer Command="{Binding ShowMusicCommand}" />
         </Label.GestureRecognizers>
@@ -34,7 +36,7 @@
         </Label.Triggers>
       </Label>
 
-      <Label x:Name="SideFolders" Text="▤   文件夹" Padding="9,7" FontSize="11.5" TextColor="#5B6270">
+      <Label Grid.Row="1" x:Name="SideFolders" Text="▤   文件夹" Padding="9,7" FontSize="11.5" TextColor="#5B6270">
         <Label.GestureRecognizers>
           <TapGestureRecognizer Command="{Binding ShowFoldersCommand}" />
         </Label.GestureRecognizers>
@@ -46,9 +48,10 @@
         </Label.Triggers>
       </Label>
 
-      <Label x:Name="SidePlaylist" Text="≡   歌单" Padding="9,7" FontSize="11.5" TextColor="#5B6270" Opacity="0.45" />
+      <Label Grid.Row="2" x:Name="SidePlaylist" Text="≡   歌单" Padding="9,7" FontSize="11.5" TextColor="#5B6270" Opacity="0.45" />
 
-      <Label x:Name="SideSettings" Text="⚙   设置" Padding="9,7" FontSize="11.5" TextColor="#5B6270" VerticalOptions="End">
+      <Label Grid.Row="4" x:Name="SideSettings" Text="⚙   设置" Padding="9,7" FontSize="11.5" TextColor="#5B6270"
+             HorizontalOptions="Fill" HorizontalTextAlignment="Start">
         <Label.GestureRecognizers>
           <TapGestureRecognizer Command="{Binding ShowSettingsCommand}" />
         </Label.GestureRecognizers>
@@ -59,7 +62,7 @@
           </DataTrigger>
         </Label.Triggers>
       </Label>
-    </VerticalStackLayout>
+    </Grid>
 
     <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto">
 

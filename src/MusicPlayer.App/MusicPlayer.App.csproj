@@ -27,14 +27,18 @@
 		<MauiXamlInflator>SourceGen</MauiXamlInflator>
 
 		<!-- Display name -->
-		<ApplicationTitle>音乐播放器</ApplicationTitle>
+		<ApplicationTitle>MusicPlayer</ApplicationTitle>
+
+		<!-- 产物就叫 MusicPlayer.exe，不带 .App 后缀 -->
+		<AssemblyName>MusicPlayer</AssemblyName>
 
 		<!-- App Identifier -->
 		<ApplicationId>com.companyname.musicplayer.app</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-		<ApplicationVersion>1</ApplicationVersion>
+		<ApplicationDisplayVersion>1.1.0</ApplicationDisplayVersion>
+		<ApplicationVersion>2</ApplicationVersion>
+		<Version>1.1.0</Version>
 
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>None</WindowsPackageType>
