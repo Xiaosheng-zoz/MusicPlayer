@@ -30,15 +30,27 @@
 
     <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto">
 
-      <!-- 顶部工具条 -->
-      <Grid Grid.Row="0" Padding="16,12,16,10" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-        <Label Grid.Column="0" Text="{Binding StatusMessage}" FontSize="14" FontAttributes="Bold"
-               TextColor="#1B1D22" VerticalOptions="Center" />
-        <Label Grid.Column="1" Text="{Binding StatusDetail}" FontSize="10.5" TextColor="#8B93A2"
-               VerticalOptions="Center" LineBreakMode="TailTruncation" />
-        <Button Grid.Column="2" Text="选择文件夹" Clicked="OnChooseFolderClicked"
-                BackgroundColor="#2F6FED" TextColor="#FFFFFF" FontSize="12" CornerRadius="8" Padding="14,8" />
-      </Grid>
+      <!-- 顶部：第一行是状态，第二行是路径输入（可以直接粘贴路径，不依赖那个只认文件夹的对话框） -->
+      <VerticalStackLayout Grid.Row="0" Padding="16,12,16,10" Spacing="8">
+        <HorizontalStackLayout Spacing="10">
+          <Label Text="{Binding StatusMessage}" FontSize="14" FontAttributes="Bold"
+                 TextColor="#1B1D22" VerticalOptions="Center" />
+          <Label Text="{Binding StatusDetail}" FontSize="10.5" TextColor="#8B93A2"
+                 VerticalOptions="Center" LineBreakMode="TailTruncation" />
+        </HorizontalStackLayout>
+
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+          <Entry Grid.Column="0" Text="{Binding FolderPath}" Completed="OnFolderPathCompleted"
+                 Placeholder="音乐文件夹路径，例如 E:\LocalMusic"
+                 FontSize="11.5" TextColor="#1B1D22" PlaceholderColor="#9AA1AF"
+                 ClearButtonVisibility="WhileEditing" HeightRequest="34" />
+          <Button Grid.Column="1" Text="打开" Command="{Binding OpenFolderCommand}" HeightRequest="34"
+                  BackgroundColor="#2F6FED" TextColor="#FFFFFF" FontSize="12" CornerRadius="8" Padding="14,6" />
+          <Button Grid.Column="2" Text="浏览…" Clicked="OnChooseFolderClicked" HeightRequest="34"
+                  BackgroundColor="Transparent" TextColor="#2F6FED" BorderColor="#2F6FED" BorderWidth="1"
+                  FontSize="12" CornerRadius="8" Padding="14,6" />
+        </Grid>
+      </VerticalStackLayout>
 
       <!-- 歌曲列表 -->
       <CollectionView Grid.Row="1" ItemsSource="{Binding Tracks}" SelectionMode="None" Margin="8,0">

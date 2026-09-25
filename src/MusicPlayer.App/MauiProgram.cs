@@ -25,6 +25,7 @@ public static class MauiProgram
 
 		builder.Services.AddSingleton<ITrackMetadataReader, TagLibMetadataReader>();
 		builder.Services.AddSingleton<ILibraryScanner, FolderLibraryScanner>();
+		builder.Services.AddSingleton<LibraryLoader>();
 		builder.Services.AddSingleton<PlayerViewModel>();
 		builder.Services.AddSingleton<MainPage>();
 

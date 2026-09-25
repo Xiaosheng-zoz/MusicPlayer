@@ -3,6 +3,7 @@ using CommunityToolkit.Maui.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.Controls;
+using MusicPlayer.App.Services;
 using MusicPlayer.Core.Library;
 using MusicPlayer.Core.Models;
 using MusicPlayer.Core.Playback;
@@ -24,15 +25,16 @@ public sealed partial class TrackItem : ObservableObject
 
 public sealed partial class PlayerViewModel : ObservableObject
 {
-    private readonly ILibraryScanner _scanner;
+    private readonly LibraryLoader _loader;
     private PlaybackController? _controller;
     private bool _isDraggingProgress;
 
-    public PlayerViewModel(ILibraryScanner scanner)
+    public PlayerViewModel(LibraryLoader loader)
     {
-        _scanner = scanner;
+        _loader = loader;
+        FolderPath = string.Empty;
         StatusMessage = "还没有音乐";
-        StatusDetail = "选一个存放音乐的文件夹，支持 MP3 和 FLAC";
+        StatusDetail = "点「浏览」选一个文件夹，或直接把路径粘贴到输入框里";
     }
 
     public ObservableCollection<TrackItem> Tracks { get; } = new();
@@ -47,6 +49,7 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     [ObservableProperty] public partial string StatusMessage { get; set; }
     [ObservableProperty] public partial string StatusDetail { get; set; }
+    [ObservableProperty] public partial string FolderPath { get; set; }
 
     [ObservableProperty] public partial string NowTitle { get; set; }
     [ObservableProperty] public partial string NowSubtitle { get; set; }
@@ -80,39 +83,64 @@ public sealed partial class PlayerViewModel : ObservableObject
     [RelayCommand]
     private async Task ChooseFolderAsync()
     {
-        var picked = await FolderPicker.Default.PickAsync(CancellationToken.None);
-        if (!picked.IsSuccessful || picked.Folder is null)
+        DiagLog.Write("PickAsync: start");
+
+        FolderPickerResult picked;
+        try
         {
+            picked = await FolderPicker.Default.PickAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            DiagLog.Write($"PickAsync THREW: {ex}");
+            StatusMessage = "选择文件夹出错";
+            StatusDetail = ex.Message;
             return;
         }
 
+        DiagLog.Write($"PickAsync: IsSuccessful={picked.IsSuccessful}, "
+           + $"Folder={picked.Folder?.Path ?? "<null>"}, "
+           + $"Exception={picked.Exception?.Message ?? "<none>"}, "
+           + $"ExceptionType={picked.Exception?.GetType().FullName ?? "<none>"}");
+
+        if (!picked.IsSuccessful || picked.Folder is null)
+        {
+            // 不能静默返回：用户要么是放弃了，要么是没能让确认按钮亮起来，
+            // 两种都需要看到一句人话，否则界面看起来像坏了。
+            StatusMessage = "没有选到文件夹";
+            StatusDetail = picked.Exception?.Message ?? "对话框没有返回文件夹";
+            return;
+        }
+
+        FolderPath = picked.Folder.Path;
+        await LoadFolderAsync(FolderPath);
+    }
+
+    /// <summary>打开输入框里那个路径。</summary>
+    [RelayCommand]
+    private async Task OpenFolderAsync() => await LoadFolderAsync(FolderPath);
+
+    private async Task LoadFolderAsync(string? path)
+    {
         IsBusy = true;
         StatusMessage = "正在扫描…";
-        StatusDetail = picked.Folder.Path;
+        StatusDetail = path ?? string.Empty;
 
         try
         {
-            var tracks = await _scanner.ScanAsync(picked.Folder.Path);
+            var result = await _loader.LoadAsync(path);
+            DiagLog.Write($"Load: path={path}, count={result.Tracks.Count}, msg={result.StatusMessage}");
 
             Tracks.Clear();
-            foreach (var track in tracks)
+            foreach (var track in result.Tracks)
             {
                 Tracks.Add(new TrackItem(track));
             }
 
-            _controller?.LoadTracks(tracks);
+            _controller?.LoadTracks(result.Tracks);
             HasTracks = Tracks.Count > 0;
-
-            if (HasTracks)
-            {
-                StatusMessage = "全部歌曲";
-                StatusDetail = $"{Tracks.Count} 首";
-            }
-            else
-            {
-                StatusMessage = "这个文件夹里没有 MP3 或 FLAC";
-                StatusDetail = picked.Folder.Path;
-            }
+            StatusMessage = result.StatusMessage;
+            StatusDetail = result.StatusDetail;
         }
         finally
         {
@@ -194,10 +222,15 @@ public sealed partial class PlayerViewModel : ObservableObject
     private void RefreshTransport()
     {
         var current = _controller?.Current;
+        var durationSeconds = Math.Max(1, _controller?.Duration.TotalSeconds ?? 1);
+        DiagLog.Write($"[vm] RefreshTransport state={_controller?.State}, "
+                    + $"dur={_controller?.Duration}, durSeconds={durationSeconds}, "
+                    + $"field DurationSeconds={DurationSeconds}, "
+                    + $"title={current?.DisplayTitle ?? "<null>"}");
         NowTitle = current?.DisplayTitle ?? string.Empty;
         NowSubtitle = current is null ? string.Empty : $"{current.DisplayArtist} · {current.DisplayAlbum}";
         IsPlaying = _controller?.State == PlaybackState.Playing;
-        DurationSeconds = Math.Max(1, _controller?.Duration.TotalSeconds ?? 1);
+        DurationSeconds = durationSeconds;
         PositionSeconds = _controller?.Position.TotalSeconds ?? 0;
         NowCover = current?.CoverArt is { Length: > 0 } bytes
             ? ImageSource.FromStream(() => new MemoryStream(bytes))

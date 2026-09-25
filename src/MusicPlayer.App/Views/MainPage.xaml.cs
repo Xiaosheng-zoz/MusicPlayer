@@ -25,6 +25,9 @@ public partial class MainPage : ContentPage
     private async void OnChooseFolderClicked(object? sender, EventArgs e)
         => await _viewModel.ChooseFolderCommand.ExecuteAsync(null);
 
+    private async void OnFolderPathCompleted(object? sender, EventArgs e)
+        => await _viewModel.OpenFolderCommand.ExecuteAsync(null);
+
     private void OnPlayPauseClicked(object? sender, EventArgs e) => _viewModel.TogglePlayPauseCommand.Execute(null);
 
     private void OnNextClicked(object? sender, EventArgs e) => _viewModel.NextCommand.Execute(null);
@@ -39,6 +42,18 @@ public partial class MainPage : ContentPage
     private void OnVolumeChanged(object? sender, ValueChangedEventArgs e) => _viewModel.SetVolume(e.NewValue);
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        try
+        {
+            ApplyTransportToUi(e);
+        }
+        catch (Exception ex)
+        {
+            DiagLog.Write($"[page] EXCEPTION on {e.PropertyName}: {ex}");
+        }
+    }
+
+    private void ApplyTransportToUi(PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(PlayerViewModel.PositionSeconds) or nameof(PlayerViewModel.DurationSeconds))
         {
