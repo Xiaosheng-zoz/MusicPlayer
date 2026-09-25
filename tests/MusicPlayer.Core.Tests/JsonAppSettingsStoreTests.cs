@@ -16,52 +16,68 @@ public class JsonAppSettingsStoreTests : IDisposable
     public void Dispose() => Directory.Delete(_dir, recursive: true);
 
     [Fact]
-    public void LoadLastFolder_ReturnsNull_WhenFileDoesNotExist()
+    public void Load_ReturnsDefaults_WhenFileDoesNotExist()
     {
-        var store = new JsonAppSettingsStore(_file);
+        var settings = new JsonAppSettingsStore(_file).Load();
 
-        Assert.Null(store.LoadLastFolder());
+        Assert.True(settings.RememberLastFolder);
+        Assert.Null(settings.LastFolder);
     }
 
     [Fact]
-    public void SaveThenLoad_RoundTripsTheFolder()
+    public void SaveThenLoad_RoundTripsBothValues()
     {
         var store = new JsonAppSettingsStore(_file);
 
-        store.SaveLastFolder(@"E:\LocalMusic");
+        store.Save(new AppSettings { RememberLastFolder = false, LastFolder = @"E:\LocalMusic" });
+        var loaded = new JsonAppSettingsStore(_file).Load();
 
-        Assert.Equal(@"E:\LocalMusic", new JsonAppSettingsStore(_file).LoadLastFolder());
+        Assert.False(loaded.RememberLastFolder);
+        Assert.Equal(@"E:\LocalMusic", loaded.LastFolder);
     }
 
     [Fact]
-    public void LoadLastFolder_ReturnsNull_WhenFileIsCorrupt()
+    public void Load_DefaultsRememberToTrue_WhenOlderFileHasNoSuchField()
+    {
+        // 这个功能是后加的：老版本写的文件里只有 LastFolder，没有开关字段。
+        // 缺字段必须当作「记住」，否则用户升级后会发现自己的设置被悄悄关掉了。
+        File.WriteAllText(_file, """{ "LastFolder": "E:\\LocalMusic" }""");
+
+        var settings = new JsonAppSettingsStore(_file).Load();
+
+        Assert.True(settings.RememberLastFolder);
+        Assert.Equal(@"E:\LocalMusic", settings.LastFolder);
+    }
+
+    [Fact]
+    public void Load_ReturnsDefaults_WhenFileIsCorrupt()
     {
         File.WriteAllText(_file, "这不是 JSON {{{{");
-        var store = new JsonAppSettingsStore(_file);
 
         // 设置文件坏掉不该让应用起不来
-        Assert.Null(store.LoadLastFolder());
+        var settings = new JsonAppSettingsStore(_file).Load();
+
+        Assert.True(settings.RememberLastFolder);
+        Assert.Null(settings.LastFolder);
     }
 
     [Fact]
-    public void SaveLastFolder_CreatesTheDirectoryIfMissing()
+    public void Save_CreatesTheDirectoryIfMissing()
     {
         var nested = Path.Combine(_dir, "a", "b", "settings.json");
         var store = new JsonAppSettingsStore(nested);
 
-        store.SaveLastFolder(@"E:\LocalMusic");
+        store.Save(new AppSettings { LastFolder = @"E:\LocalMusic" });
 
         Assert.True(File.Exists(nested));
-        Assert.Equal(@"E:\LocalMusic", store.LoadLastFolder());
+        Assert.Equal(@"E:\LocalMusic", store.Load().LastFolder);
     }
 
     [Fact]
-    public void LoadLastFolder_ReturnsNull_WhenSavedFolderIsBlank()
+    public void Load_NormalisesBlankFolderToNull()
     {
-        var store = new JsonAppSettingsStore(_file);
+        File.WriteAllText(_file, """{ "RememberLastFolder": true, "LastFolder": "   " }""");
 
-        store.SaveLastFolder("   ");
-
-        Assert.Null(store.LoadLastFolder());
+        Assert.Null(new JsonAppSettingsStore(_file).Load().LastFolder);
     }
 }

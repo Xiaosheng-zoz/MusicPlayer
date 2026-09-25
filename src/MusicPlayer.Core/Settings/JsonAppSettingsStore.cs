@@ -10,34 +10,40 @@ public sealed class JsonAppSettingsStore : IAppSettingsStore
 
     public JsonAppSettingsStore(string filePath) => _filePath = filePath;
 
-    public string? LoadLastFolder()
+    public string Location => _filePath;
+
+    public AppSettings Load()
     {
         try
         {
             if (!File.Exists(_filePath))
             {
-                return null;
+                return new AppSettings();
             }
 
-            var settings = JsonSerializer.Deserialize<SettingsFile>(File.ReadAllText(_filePath), Options);
-            var folder = settings?.LastFolder;
+            var file = JsonSerializer.Deserialize<SettingsFile>(File.ReadAllText(_filePath), Options);
+            if (file is null)
+            {
+                return new AppSettings();
+            }
 
-            return string.IsNullOrWhiteSpace(folder) ? null : folder;
+            return new AppSettings
+            {
+                // 老版本写的文件里没有这个字段，缺省当作「记住」——
+                // 否则用户升级后会发现自己的设置被悄悄关掉了
+                RememberLastFolder = file.RememberLastFolder ?? true,
+                LastFolder = string.IsNullOrWhiteSpace(file.LastFolder) ? null : file.LastFolder
+            };
         }
         catch (Exception)
         {
-            // 设置文件损坏或没有读权限都不该让应用起不来，当作"没设置过"即可
-            return null;
+            // 设置文件损坏或没有读权限都不该让应用起不来，当作默认设置即可
+            return new AppSettings();
         }
     }
 
-    public void SaveLastFolder(string folderPath)
+    public void Save(AppSettings settings)
     {
-        if (string.IsNullOrWhiteSpace(folderPath))
-        {
-            return;
-        }
-
         try
         {
             var directory = Path.GetDirectoryName(_filePath);
@@ -46,9 +52,13 @@ public sealed class JsonAppSettingsStore : IAppSettingsStore
                 Directory.CreateDirectory(directory);
             }
 
-            File.WriteAllText(
-                _filePath,
-                JsonSerializer.Serialize(new SettingsFile { LastFolder = folderPath }, Options));
+            var file = new SettingsFile
+            {
+                RememberLastFolder = settings.RememberLastFolder,
+                LastFolder = settings.LastFolder
+            };
+
+            File.WriteAllText(_filePath, JsonSerializer.Serialize(file, Options));
         }
         catch (Exception)
         {
@@ -58,6 +68,8 @@ public sealed class JsonAppSettingsStore : IAppSettingsStore
 
     private sealed class SettingsFile
     {
+        public bool? RememberLastFolder { get; set; }
+
         public string? LastFolder { get; set; }
     }
 }

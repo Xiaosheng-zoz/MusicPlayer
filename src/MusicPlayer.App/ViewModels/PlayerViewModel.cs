@@ -12,6 +12,12 @@ using MusicPlayer.Core.Settings;
 
 namespace MusicPlayer.App.ViewModels;
 
+public enum AppSection
+{
+    Library,
+    Settings
+}
+
 public sealed partial class TrackItem : ObservableObject
 {
     private readonly Func<byte[]?> _coverLoader;
@@ -69,16 +75,18 @@ public sealed partial class PlayerViewModel : ObservableObject
 {
     private readonly LibraryLoader _loader;
     private readonly ICoverArtReader _coverArt;
-    private readonly IAppSettingsStore _settings;
+    private readonly IAppSettingsStore _settingsStore;
+    private AppSettings _settings = new();
+    private bool _initializing;
     private PlaybackController? _controller;
     private bool _isDraggingProgress;
     private string _nowCoverPath = string.Empty;
 
-    public PlayerViewModel(LibraryLoader loader, ICoverArtReader coverArt, IAppSettingsStore settings)
+    public PlayerViewModel(LibraryLoader loader, ICoverArtReader coverArt, IAppSettingsStore settingsStore)
     {
         _loader = loader;
         _coverArt = coverArt;
-        _settings = settings;
+        _settingsStore = settingsStore;
         FolderPath = string.Empty;
         StatusMessage = "还没有音乐";
         StatusDetail = "点「浏览」选一个文件夹，或直接把路径粘贴到输入框里";
@@ -106,6 +114,25 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] public partial bool IsPlaying { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLibrarySelected))]
+    [NotifyPropertyChangedFor(nameof(IsSettingsSelected))]
+    public partial AppSection Section { get; set; }
+
+    public bool IsLibrarySelected => Section == AppSection.Library;
+    public bool IsSettingsSelected => Section == AppSection.Settings;
+
+    /// <summary>设置里那个开关：关掉就不再记住、也不再自动打开文件夹。</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RememberLastFolderHint))]
+    public partial bool RememberLastFolder { get; set; }
+
+    public string RememberLastFolderHint => RememberLastFolder
+        ? "下次启动自动打开这个文件夹"
+        : "下次启动不自动打开文件夹，已记住的路径也清掉了";
+
+    public string SettingsFilePath => $"设置文件：{_settingsStore.Location}";
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PlayModeGlyph))]
     [NotifyPropertyChangedFor(nameof(PlayModeTooltip))]
     public partial PlayMode Mode { get; set; }
@@ -126,18 +153,49 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     public bool IsEmpty => !HasTracks && !IsBusy;
 
+    [RelayCommand]
+    private void ShowLibrary() => Section = AppSection.Library;
+
+    [RelayCommand]
+    private void ShowSettings() => Section = AppSection.Settings;
+
     /// <summary>启动时自动打开上次用过的文件夹。</summary>
     [RelayCommand]
     private async Task InitializeAsync()
     {
-        var lastFolder = _settings.LoadLastFolder();
-        if (string.IsNullOrWhiteSpace(lastFolder))
+        _initializing = true;
+        try
         {
-            return;
+            _settings = _settingsStore.Load();
+            RememberLastFolder = _settings.RememberLastFolder;
+
+            if (_settings.RememberLastFolder && !string.IsNullOrWhiteSpace(_settings.LastFolder))
+            {
+                FolderPath = _settings.LastFolder;
+                await LoadFolderAsync(_settings.LastFolder);
+            }
+        }
+        finally
+        {
+            _initializing = false;
+        }
+    }
+
+    partial void OnRememberLastFolderChanged(bool value)
+    {
+        if (_initializing)
+        {
+            return; // 初始化时是在读设置，不要立刻回写
         }
 
-        FolderPath = lastFolder;
-        await LoadFolderAsync(lastFolder);
+        _settings = _settings with
+        {
+            RememberLastFolder = value,
+            // 关掉就把记住的路径一并清掉：留着一条"已经说过不要记"的路径不合理
+            LastFolder = value && HasTracks ? FolderPath : null
+        };
+
+        _settingsStore.Save(_settings);
     }
 
     /// <summary>MediaElement 必须先存在于视觉树里，所以播放器由页面构造好再注入进来。</summary>
@@ -229,7 +287,13 @@ public sealed partial class PlayerViewModel : ObservableObject
             // 只记住真实存在的文件夹：路径打错不该被记下来，否则下次启动就自动报错
             if (result.FolderExists && path is not null)
             {
-                _settings.SaveLastFolder(path);
+                FolderPath = path; // 顺便把首尾空格去掉
+
+                if (_settings.RememberLastFolder)
+                {
+                    _settings = _settings with { LastFolder = path };
+                    _settingsStore.Save(_settings);
+                }
             }
         }
         finally
