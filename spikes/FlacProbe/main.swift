@@ -44,13 +44,9 @@ guard let track = tracks.first else {
 }
 print("[1] AVAsset 解析成功：时长 \(String(format: "%.2f", asset.duration.seconds)) 秒，音频轨 \(tracks.count) 条")
 
-for desc in track.formatDescriptions {
-    // desc 本身就是 CMFormatDescription，不能对它做条件转换（Swift 会报
-    // "conditional downcast will always succeed"），直接传即可
-    guard let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(desc) else { continue }
-    let d = asbd.pointee
-    print("      轨道格式：\(d.mSampleRate) Hz / \(d.mChannelsPerFrame) 声道 / \(d.mBitsPerChannel) bit")
-}
+// 这里本来还会打印轨道的采样率/位深，但 AVAssetTrack.formatDescriptions 的元素是 Any，
+// 取 ASBD 需要 CF 类型转换，而 Swift 对这一步的桥接很挑剔（条件转换被拒、直接传又类型不符）。
+// 同样的信息下一步的 AVAudioFile 就能给，而它才是真正的解码测试，所以这里不再画蛇添足。
 
 // 2. 真正解码 —— 这一步才说明系统解码器吃不吃得下。
 //    打不开 = 格式不支持；读不出帧 = 解不出数据。
