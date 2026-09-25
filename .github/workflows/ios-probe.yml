@@ -14,7 +14,10 @@ on:
 
 jobs:
   probe:
-    runs-on: macos-15
+    # 必须用 macos-26：.NET 10 的 iOS SDK 是 26.5，要求 Xcode 26.6，
+    # 而 macos-15 镜像只有 Xcode 16.4（第一次跑就是死在这里）。
+    # macos-26 的默认 Xcode 正好是 26.6。
+    runs-on: macos-26
     timeout-minutes: 45
 
     steps:
@@ -27,21 +30,46 @@ jobs:
       - name: 安装 iOS 的 MAUI 工作负载
         run: dotnet workload install maui-ios
 
-      - name: 环境信息
+      - name: 选定 Xcode 并算出模拟器 RID
         run: |
+          set -euo pipefail
+
+          XCODE=$(ls -d /Applications/Xcode_26.6*.app 2>/dev/null | head -1 || true)
+          if [ -z "$XCODE" ]; then
+            echo "❌ 这个镜像里没有 Xcode 26.6。可用的有："
+            ls -d /Applications/Xcode*.app || true
+            echo "（.NET 10 的 iOS SDK 26.5 强制要求 Xcode 26.6）"
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE"
+          echo "已选用 $XCODE"
+
+          # 不写死架构：镜像可能是 arm64 也可能是 x64
+          if [ "$(uname -m)" = "arm64" ]; then
+            RID=iossimulator-arm64
+          else
+            RID=iossimulator-x64
+          fi
+          echo "RID=$RID" >> "$GITHUB_ENV"
+
+          echo "---------- 环境信息 ----------"
           dotnet --version
           xcodebuild -version
-          xcrun simctl list runtimes | head -20
+          uname -m
+          echo "RID=$RID"
+          xcrun simctl list runtimes
 
       - name: 编译探针（模拟器）
         run: |
+          set -euo pipefail
           dotnet build spikes/IosProbe/IosProbe.csproj \
             -f net10.0-ios \
             -c Debug \
-            -p:RuntimeIdentifier=iossimulator-arm64
+            -p:RuntimeIdentifier="$RID"
 
       - name: 启动模拟器
         run: |
+          set -euo pipefail
           DEVICE_ID=$(xcrun simctl list devices available -j \
             | jq -r 'first(.devices[] | .[] | select(.name | test("iPhone")) | .udid)')
           if [ -z "$DEVICE_ID" ] || [ "$DEVICE_ID" = "null" ]; then
@@ -53,17 +81,18 @@ jobs:
 
       - name: 装进模拟器并运行探针
         run: |
-          set -o pipefail
-          APP=$(find spikes/IosProbe/bin/Debug/net10.0-ios/iossimulator-arm64 \
-            -maxdepth 1 -name '*.app' | head -1)
+          set -euo pipefail
+          APP=$(find "spikes/IosProbe/bin/Debug/net10.0-ios/$RID" -maxdepth 1 -name '*.app' | head -1)
           if [ -z "$APP" ]; then
             echo "没找到 .app"; find spikes/IosProbe/bin -maxdepth 4 -name '*.app'; exit 1
           fi
           echo "APP=$APP"
           xcrun simctl install "$DEVICE_ID" "$APP"
 
-          # --console-pty 会把应用的 stdout 回传到这个步骤的日志里
-          xcrun simctl launch --console-pty "$DEVICE_ID" com.xszoz.iosprobe 2>&1 | tee probe-output.txt
+          # --console-pty 会把应用的 stdout 回传到这个步骤的日志里。
+          # 末尾的 || true 是有意的：探针失败时应用以非零码退出，别让它把步骤提前打断，
+          # 结论统一由下面的 grep 判定。
+          xcrun simctl launch --console-pty "$DEVICE_ID" com.xszoz.iosprobe 2>&1 | tee probe-output.txt || true
 
           echo "---------------- 探针输出 ----------------"
           cat probe-output.txt
