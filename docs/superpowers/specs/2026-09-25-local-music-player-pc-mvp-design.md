@@ -57,7 +57,11 @@
 
 ### 3.1 前置步骤
 
-当前机器只有 .NET SDK 10.0.301，没有任何 workload。开工第一步需要执行 `dotnet workload install maui`（约 1GB 下载）。
+当前机器只有 .NET SDK 10.0.301，没有任何 workload。开工第一步需要执行 `dotnet workload install maui-windows`。
+
+这里刻意不用完整的 `maui` 工作负载：`maui-windows` 只装 Windows 目标所需的部分，体积小得多，而本阶段 App 项目只会保留 `net10.0-windows10.0.19041.0` 这一个目标框架。等做 iOS 端时再补装 `maui-ios`。
+
+如果安装报权限错误，需要用管理员权限的终端执行。
 
 ### 3.2 已知风险与缓解
 
