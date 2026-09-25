@@ -59,6 +59,49 @@ jobs:
           echo "RID=$RID"
           xcrun simctl list runtimes
 
+      - name: 准备 Xcode 工具链（首次初始化 + 缺组件补装）
+        run: |
+          set -uo pipefail
+
+          echo "======================== 诊断开始 ========================"
+          echo "--- xcode-select -p ---"
+          xcode-select -p || true
+
+          echo "--- 可用 SDK ---"
+          xcodebuild -showsdks || true
+
+          echo "--- Platforms 目录 ---"
+          ls "$(xcode-select -p)/Platforms/" || true
+
+          echo "--- 各 SDK 下找 actool ---"
+          for sdk in iphonesimulator iphoneos macosx; do
+            printf '%-16s -> ' "$sdk"
+            xcrun --sdk "$sdk" --find actool 2>&1 || true
+          done
+
+          echo "--- 直接在 Xcode 目录里找 actool ---"
+          find "$(xcode-select -p)/.." -name actool -maxdepth 6 2>/dev/null | head -10 || true
+          echo "======================== 诊断结束 ========================"
+
+          # 新选中的 Xcode 常常需要跑一次首次初始化，否则命令行工具不全
+          echo "--- 执行 xcodebuild -runFirstLaunch ---"
+          sudo xcodebuild -runFirstLaunch || echo "（runFirstLaunch 返回非零，继续）"
+
+          # 如果 iOS 平台组件确实缺失，补下载
+          if ! xcrun --sdk iphonesimulator --find actool >/dev/null 2>&1; then
+            echo "--- actool 仍找不到，尝试补装 iOS 平台组件（可能要几分钟）---"
+            sudo xcodebuild -downloadPlatform iOS || echo "（downloadPlatform 返回非零，继续）"
+            xcodebuild -showsdks || true
+          fi
+
+          echo "--- 最终确认 ---"
+          if xcrun --sdk iphonesimulator --find actool; then
+            echo "✅ actool 可用，可以编译"
+          else
+            echo "❌ actool 仍然找不到。上面的诊断信息就是判断依据，别再往下走了。"
+            exit 1
+          fi
+
       - name: 编译探针（模拟器）
         run: |
           set -euo pipefail
