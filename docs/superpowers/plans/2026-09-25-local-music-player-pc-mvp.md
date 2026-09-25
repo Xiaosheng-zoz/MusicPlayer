@@ -1693,6 +1693,7 @@ git commit -m "feat: MAUI 应用骨架，选文件夹、歌曲列表与空状态
 创建 `src/MusicPlayer.App/Services/MediaElementAudioPlayer.cs`：
 
 ```csharp
+using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Maui.Views;
 using MusicPlayer.Core.Playback;
 
@@ -1729,7 +1730,7 @@ public sealed class MediaElementAudioPlayer : IAudioPlayer
         set => _media.Volume = Math.Clamp(value, 0d, 1d);
     }
 
-    public PlaybackState State => _media.State switch
+    public PlaybackState State => _media.CurrentState switch
     {
         MediaElementState.Playing => PlaybackState.Playing,
         MediaElementState.Paused => PlaybackState.Paused,
@@ -2054,34 +2055,26 @@ git commit -m "feat: 接入 MediaElement 实现真实播放，播放条可用"
 ### Task 8: 窗口最小尺寸
 
 **Files:**
-- Modify: `src/MusicPlayer.App/MauiProgram.cs`
+- Modify: `src/MusicPlayer.App/App.xaml.cs`
 
 **Interfaces:**
 - Consumes: 无
 - Produces: 无（纯平台行为）
 
-- [ ] **Step 1: 加 Windows 生命周期钩子**
+- [ ] **Step 1: 在创建窗口时设最小尺寸**
 
-在 `MauiProgram.cs` 顶部加 `using Microsoft.Maui.LifecycleEvents;`，并在 `builder` 那条链上加：
+MAUI 的 `Window` 自带 `MinimumWidth` / `MinimumHeight`，不需要写任何 WinRT 平台代码。把 `App.xaml.cs` 的 `CreateWindow` 改成：
 
 ```csharp
-#if WINDOWS
-        builder.ConfigureLifecycleEvents(events =>
-        {
-            events.AddWindows(windows => windows.OnWindowCreated(window =>
-            {
-                var handle = WinRT.Interop.WindowNative.GetWindowHandle(window);
-                var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(handle);
-                var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
-
-                if (appWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
-                {
-                    presenter.SetPreferredMinSize(new Windows.Graphics.SizeInt32(480, 520));
-                }
-            }));
-        });
-#endif
+protected override Window CreateWindow(IActivationState? activationState)
+    => new(_services.GetRequiredService<Views.MainPage>())
+    {
+        MinimumWidth = 480,
+        MinimumHeight = 520
+    };
 ```
+
+> 曾经试过用 WinRT 的 `OverlappedPresenter.SetPreferredMinSize`，但本项目引用的 Windows App SDK 1.6 里没有这个方法，编译直接失败。MAUI 自带的这两个属性既跨平台又更简单，所以改用它们。
 
 - [ ] **Step 2: 手工验证**
 

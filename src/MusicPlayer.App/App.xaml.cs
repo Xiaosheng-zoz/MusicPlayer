@@ -13,5 +13,9 @@ public partial class App : Application
 	}
 
 	protected override Window CreateWindow(IActivationState? activationState)
-		=> new(_services.GetRequiredService<Views.MainPage>());
+		=> new(_services.GetRequiredService<Views.MainPage>())
+		{
+			MinimumWidth = 480,
+			MinimumHeight = 520
+		};
 }
