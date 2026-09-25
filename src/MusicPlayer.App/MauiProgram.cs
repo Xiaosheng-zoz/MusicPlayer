@@ -23,7 +23,9 @@ public static class MauiProgram
 				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 			});
 
-		builder.Services.AddSingleton<ITrackMetadataReader, TagLibMetadataReader>();
+		builder.Services.AddSingleton<TagLibMetadataReader>();
+		builder.Services.AddSingleton<ITrackMetadataReader>(sp => sp.GetRequiredService<TagLibMetadataReader>());
+		builder.Services.AddSingleton<ICoverArtReader>(sp => sp.GetRequiredService<TagLibMetadataReader>());
 		builder.Services.AddSingleton<ILibraryScanner, FolderLibraryScanner>();
 		builder.Services.AddSingleton<LibraryLoader>();
 		builder.Services.AddSingleton<PlayerViewModel>();

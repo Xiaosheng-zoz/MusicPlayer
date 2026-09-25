@@ -9,7 +9,6 @@ public sealed record Track
     public string Artist { get; init; } = string.Empty;
     public string Album { get; init; } = string.Empty;
     public TimeSpan Duration { get; init; }
-    public byte[]? CoverArt { get; init; }
 
     /// <summary>扩展名大写形式，例如 FLAC、MP3。</summary>
     public string Format => Path.GetExtension(FilePath).TrimStart('.').ToUpperInvariant();

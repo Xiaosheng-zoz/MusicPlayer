@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.Controls;
 using MusicPlayer.App.Services;
 using MusicPlayer.Core.Library;
+using MusicPlayer.Core.Metadata;
 using MusicPlayer.Core.Models;
 using MusicPlayer.Core.Playback;
 
@@ -12,10 +13,15 @@ namespace MusicPlayer.App.ViewModels;
 
 public sealed partial class TrackItem : ObservableObject
 {
-    public TrackItem(Track track, int number)
+    private readonly Func<byte[]?> _coverLoader;
+    private ImageSource? _cover;
+    private bool _coverLoaded;
+
+    public TrackItem(Track track, int number, Func<byte[]?> coverLoader)
     {
         Track = track;
         Number = number;
+        _coverLoader = coverLoader;
     }
 
     public Track Track { get; }
@@ -24,10 +30,23 @@ public sealed partial class TrackItem : ObservableObject
     public string Subtitle => Track.DisplaySubtitle;
     public string Duration => Track.DisplayDuration;
 
-    /// <summary>列表行左侧的封面缩略图。没有内嵌封面时为 null，由 XAML 里的底色兜底。</summary>
-    public ImageSource? Cover => Track.CoverArt is { Length: > 0 } bytes
-        ? ImageSource.FromStream(() => new MemoryStream(bytes))
-        : null;
+    /// <summary>
+    /// 列表行左侧的封面缩略图。**第一次被界面读取时才去磁盘读那一首**——
+    /// CollectionView 只实例化可见的行，所以两百多首的库不会把封面全读进内存。
+    /// </summary>
+    public ImageSource? Cover
+    {
+        get
+        {
+            if (!_coverLoaded)
+            {
+                _coverLoaded = true;
+                _cover = CoverImage.FromBytes(_coverLoader());
+            }
+
+            return _cover;
+        }
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RowColor))]
@@ -48,12 +67,15 @@ public sealed partial class TrackItem : ObservableObject
 public sealed partial class PlayerViewModel : ObservableObject
 {
     private readonly LibraryLoader _loader;
+    private readonly ICoverArtReader _coverArt;
     private PlaybackController? _controller;
     private bool _isDraggingProgress;
+    private string _nowCoverPath = string.Empty;
 
-    public PlayerViewModel(LibraryLoader loader)
+    public PlayerViewModel(LibraryLoader loader, ICoverArtReader coverArt)
     {
         _loader = loader;
+        _coverArt = coverArt;
         FolderPath = string.Empty;
         StatusMessage = "还没有音乐";
         StatusDetail = "点「浏览」选一个文件夹，或直接把路径粘贴到输入框里";
@@ -159,7 +181,7 @@ public sealed partial class PlayerViewModel : ObservableObject
             Tracks.Clear();
             foreach (var track in result.Tracks)
             {
-                Tracks.Add(new TrackItem(track, Tracks.Count + 1));
+                Tracks.Add(new TrackItem(track, Tracks.Count + 1, () => _coverArt.ReadCoverArt(track.FilePath)));
             }
 
             _controller?.LoadTracks(result.Tracks);
@@ -245,9 +267,13 @@ public sealed partial class PlayerViewModel : ObservableObject
         IsPlaying = _controller?.State == PlaybackState.Playing;
         DurationSeconds = durationSeconds;
         PositionSeconds = _controller?.Position.TotalSeconds ?? 0;
-        NowCover = current?.CoverArt is { Length: > 0 } bytes
-            ? ImageSource.FromStream(() => new MemoryStream(bytes))
-            : null;
+        // 播放条封面也按需读，并且只在换歌时才读一次
+        var coverPath = current?.FilePath ?? string.Empty;
+        if (_nowCoverPath != coverPath)
+        {
+            _nowCoverPath = coverPath;
+            NowCover = coverPath.Length == 0 ? null : CoverImage.FromBytes(_coverArt.ReadCoverArt(coverPath));
+        }
 
         // 放在这里而不是只在上一首/下一首命令里：自动切歌也走这条路，
         // 否则播完自动下一首时列表高亮会停在上一首。

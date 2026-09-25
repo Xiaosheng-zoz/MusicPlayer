@@ -67,4 +67,54 @@ public class TagLibMetadataReaderTests
             Directory.Delete(tempDir, recursive: true);
         }
     }
+
+    [Fact]
+    public void ReadCoverArt_ReturnsNull_WhenFileIsNotRealAudio()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"mp-nocover-{Guid.NewGuid():N}.mp3");
+        File.WriteAllText(path, "definitely not an audio file");
+
+        try
+        {
+            Assert.Null(new TagLibMetadataReader().ReadCoverArt(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void ReadCoverArt_ReturnsBytes_FromRealSampleCopiedOutOfTheMusicLibrary()
+    {
+        const string library = @"E:\LocalMusic";
+        if (!Directory.Exists(library))
+        {
+            return;
+        }
+
+        var source = Directory.EnumerateFiles(library, "*.flac", SearchOption.AllDirectories).FirstOrDefault();
+        if (source is null)
+        {
+            return;
+        }
+
+        var tempDir = Path.Combine(Path.GetTempPath(), $"mp-cover-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        var copy = Path.Combine(tempDir, Path.GetFileName(source));
+        File.Copy(source, copy);
+
+        try
+        {
+            var bytes = new TagLibMetadataReader().ReadCoverArt(copy);
+
+            Assert.NotNull(bytes);
+            Assert.True(bytes!.Length > 0, "真实 FLAC 样本应当能读出内嵌封面");
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
 }

@@ -81,6 +81,7 @@ MusicPlayer.sln
 │   ├─ Models/Track.cs
 │   ├─ Library/FolderLibraryScanner.cs
 │   ├─ Metadata/TagLibMetadataReader.cs
+│   ├─ Metadata/ICoverArtReader.cs        # 封面按需读取，不进扫描路径
 │   └─ Playback/
 │       ├─ IAudioPlayer.cs
 │       ├─ PlaybackQueue.cs
@@ -99,6 +100,8 @@ MusicPlayer.sln
 **`IAudioPlayer` 是唯一接触平台播放器的地方。** 接口大致为 `Load(path)` / `Play` / `Pause` / `Seek` / `Position` / `Volume` / `Ended` 事件。PC 端 MVP 用 MediaElement 实现它；换 LibVLC 或做 iOS 都只是多一个实现类，上层一行不改。
 
 **元数据读取必须能降级。** TagLib# 遇到没有标签的文件返回空值，遇到损坏文件抛异常，两种都不能让整次扫描失败。
+
+**封面不进 `Track`，按需读取。** 一个两百多首的库，内嵌封面字节加起来能到几百 MB。如果把封面放进 `Track`，扫描时就会把它们全读进内存——实测工作集从 185 MB 涨到 635 MB。所以封面单独走 `ICoverArtReader`，由列表行第一次被显示时才去读那一首。
 
 ### 4.2 数据流
 
