@@ -150,8 +150,11 @@ public sealed partial class PlayerViewModel : ObservableObject
 
         try
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var result = await _loader.LoadAsync(path);
-            DiagLog.Write($"Load: path={path}, count={result.Tracks.Count}, msg={result.StatusMessage}");
+            stopwatch.Stop();
+            DiagLog.Write($"[vm] Load: path={path}, count={result.Tracks.Count}, "
+                        + $"elapsed={stopwatch.ElapsedMilliseconds} ms, msg={result.StatusMessage}");
 
             Tracks.Clear();
             foreach (var track in result.Tracks)
