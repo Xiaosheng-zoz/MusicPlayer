@@ -14,6 +14,10 @@ on:
 
 jobs:
   probe:
+    # 需要把日志推到 ci-logs 分支，供远程排查（作业日志下载要登录，读不到）
+    permissions:
+      contents: write
+
     # 必须用 macos-26：.NET 10 的 iOS SDK 是 26.5，要求 Xcode 26.6，
     # 而 macos-15 镜像只有 Xcode 16.4（第一次跑就是死在这里）。
     # macos-26 的默认 Xcode 正好是 26.6。
@@ -179,3 +183,26 @@ jobs:
           name: ios-probe-output
           path: probe-output.txt
           if-no-files-found: warn
+
+      # 作业日志的 API 下载需要登录（公开仓库也一样，403），
+      # 所以把日志推到独立分支 ci-logs，用 contents 接口就能读到。
+      # 推到独立分支是为了不污染 master；路径过滤也不匹配 .ci-logs，不会再触发构建。
+      - name: 把日志推到 ci-logs 分支
+        if: always()
+        run: |
+          set -uo pipefail
+          mkdir -p .ci-logs
+          cp build.log .ci-logs/build.log 2>/dev/null || echo "(没有 build.log)" > .ci-logs/build.log
+          cp probe-output.txt .ci-logs/probe-output.txt 2>/dev/null || true
+          {
+            echo "run_number: ${{ github.run_number }}"
+            echo "sha: $GITHUB_SHA"
+            echo "RID: ${RID:-<未设置>}"
+          } > .ci-logs/meta.txt
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B ci-logs
+          git add -f .ci-logs
+          git commit -m "ci: 第 ${{ github.run_number }} 次构建日志"
+          git push -f origin ci-logs
