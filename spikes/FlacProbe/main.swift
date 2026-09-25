@@ -29,12 +29,12 @@ if CommandLine.arguments.count > 1 {
 }
 
 let url = URL(fileURLWithPath: path)
-let sizeMB = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int)
-    .flatMap { $0 }.map { Double($0) / 1024 / 1024 }
+let sizeBytes = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int
+let sizeText = sizeBytes.map { String(format: "%.2f MB", Double($0) / 1024 / 1024) } ?? "?"
 
 print("=== FLAC 解码探针（Swift + AVFoundation）===")
 print("运行平台: \(ProcessInfo.processInfo.operatingSystemVersionString)")
-print("样本: \(url.lastPathComponent)  \(sizeMB.map { String(format: "%.2f MB", $0) } ?? "?")")
+print("样本: \(url.lastPathComponent)  \(sizeText)")
 
 // 1. 容器与轨道信息
 let asset = AVURLAsset(url: url)
@@ -45,8 +45,9 @@ guard let track = tracks.first else {
 print("[1] AVAsset 解析成功：时长 \(String(format: "%.2f", asset.duration.seconds)) 秒，音频轨 \(tracks.count) 条")
 
 for desc in track.formatDescriptions {
-    guard let audioDesc = desc as? CMAudioFormatDescription,
-          let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(audioDesc) else { continue }
+    // desc 本身就是 CMFormatDescription，不能对它做条件转换（Swift 会报
+    // "conditional downcast will always succeed"），直接传即可
+    guard let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(desc) else { continue }
     let d = asbd.pointee
     print("      轨道格式：\(d.mSampleRate) Hz / \(d.mChannelsPerFrame) 声道 / \(d.mBitsPerChannel) bit")
 }
