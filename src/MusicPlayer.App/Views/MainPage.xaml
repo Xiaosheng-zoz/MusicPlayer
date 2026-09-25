@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              xmlns:vm="clr-namespace:MusicPlayer.App.ViewModels"
              x:Class="MusicPlayer.App.Views.MainPage"
              x:Name="PageRoot"
@@ -8,6 +9,14 @@
              BackgroundColor="#FFFFFF">
 
   <Grid ColumnDefinitions="132,*" x:Name="RootGrid">
+
+    <!-- 只负责出声，不参与视觉；Opacity=0 加 InputTransparent 保证看不见也点不到 -->
+    <toolkit:MediaElement x:Name="Media"
+                          Grid.ColumnSpan="2"
+                          Opacity="0"
+                          InputTransparent="True"
+                          ShouldAutoPlay="False"
+                          ShouldShowPlaybackControls="False" />
 
     <!-- 侧栏：本阶段只有"资料库"是活的，其余按最终形态摆好但禁用 -->
     <VerticalStackLayout Grid.Column="0" x:Name="Sidebar"
@@ -56,6 +65,12 @@
 
               <Label Grid.Column="2" Text="{Binding Duration}" FontSize="11" TextColor="#8B93A2"
                      VerticalOptions="Center" HorizontalTextAlignment="End" />
+
+              <Grid.GestureRecognizers>
+                <TapGestureRecognizer
+                    Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.PlayTrackCommand}"
+                    CommandParameter="{Binding .}" />
+              </Grid.GestureRecognizers>
             </Grid>
           </DataTemplate>
         </CollectionView.ItemTemplate>
@@ -71,8 +86,45 @@
                 TextColor="#FFFFFF" FontSize="12" CornerRadius="8" Padding="18,9" HorizontalOptions="Center" />
       </VerticalStackLayout>
 
-      <!-- 播放条占位，Task 7 填内容 -->
-      <Grid Grid.Row="2" x:Name="TransportBar" HeightRequest="64" BackgroundColor="#FCFCFD" />
+      <!-- 底部播放条 -->
+      <Grid Grid.Row="2" x:Name="TransportBar" HeightRequest="64" BackgroundColor="#FCFCFD"
+            Padding="14,0" ColumnDefinitions="190,Auto,*,96" ColumnSpacing="14">
+
+        <HorizontalStackLayout Grid.Column="0" Spacing="9" VerticalOptions="Center">
+          <Border WidthRequest="38" HeightRequest="38" StrokeThickness="0" BackgroundColor="#2F6FED">
+            <Border.StrokeShape><RoundRectangle CornerRadius="7" /></Border.StrokeShape>
+            <!-- 没有封面时，底下这层蓝色方块就是占位 -->
+            <Image Source="{Binding NowCover}" Aspect="AspectFill" />
+          </Border>
+          <VerticalStackLayout VerticalOptions="Center" Spacing="0">
+            <Label Text="{Binding NowTitle}" FontSize="11.5" FontAttributes="Bold" TextColor="#1B1D22" LineBreakMode="TailTruncation" />
+            <Label Text="{Binding NowSubtitle}" FontSize="10" TextColor="#8B93A2" LineBreakMode="TailTruncation" />
+          </VerticalStackLayout>
+        </HorizontalStackLayout>
+
+        <HorizontalStackLayout Grid.Column="1" Spacing="13" VerticalOptions="Center">
+          <Button Text="⏮" Clicked="OnPreviousClicked" BackgroundColor="Transparent" TextColor="#5B6270" FontSize="14" Padding="0" WidthRequest="28" />
+          <Button x:Name="PlayPauseButton" Text="▶" Clicked="OnPlayPauseClicked"
+                  BackgroundColor="#2F6FED" TextColor="#FFFFFF" FontSize="12"
+                  WidthRequest="34" HeightRequest="34" CornerRadius="17" Padding="0" />
+          <Button Text="⏭" Clicked="OnNextClicked" BackgroundColor="Transparent" TextColor="#5B6270" FontSize="14" Padding="0" WidthRequest="28" />
+        </HorizontalStackLayout>
+
+        <Grid Grid.Column="2" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="9" VerticalOptions="Center">
+          <Label x:Name="PositionLabel" Grid.Column="0" Text="0:00" FontSize="10" TextColor="#8B93A2" VerticalOptions="Center" />
+          <Slider x:Name="ProgressSlider" Grid.Column="1" Minimum="0" Maximum="1"
+                  MaximumTrackColor="#E2E6EE" MinimumTrackColor="#2F6FED" ThumbColor="#2F6FED"
+                  DragStarted="OnProgressDragStarted" DragCompleted="OnProgressDragCompleted" />
+          <Label x:Name="DurationLabel" Grid.Column="2" Text="--:--" FontSize="10" TextColor="#8B93A2" VerticalOptions="Center" />
+        </Grid>
+
+        <HorizontalStackLayout Grid.Column="3" x:Name="VolumeGroup" Spacing="7" VerticalOptions="Center">
+          <Label Text="🔊" FontSize="11" TextColor="#8B93A2" VerticalOptions="Center" />
+          <Slider x:Name="VolumeSlider" Minimum="0" Maximum="1" Value="0.8"
+                  MaximumTrackColor="#E2E6EE" MinimumTrackColor="#B9C3D4" ThumbColor="#B9C3D4"
+                  WidthRequest="70" ValueChanged="OnVolumeChanged" />
+        </HorizontalStackLayout>
+      </Grid>
 
     </Grid>
   </Grid>

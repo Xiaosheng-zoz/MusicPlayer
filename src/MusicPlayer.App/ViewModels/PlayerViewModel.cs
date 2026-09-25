@@ -2,8 +2,10 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Maui.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Maui.Controls;
 using MusicPlayer.Core.Library;
 using MusicPlayer.Core.Models;
+using MusicPlayer.Core.Playback;
 
 namespace MusicPlayer.App.ViewModels;
 
@@ -23,6 +25,8 @@ public sealed partial class TrackItem : ObservableObject
 public sealed partial class PlayerViewModel : ObservableObject
 {
     private readonly ILibraryScanner _scanner;
+    private PlaybackController? _controller;
+    private bool _isDraggingProgress;
 
     public PlayerViewModel(ILibraryScanner scanner)
     {
@@ -44,7 +48,34 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] public partial string StatusMessage { get; set; }
     [ObservableProperty] public partial string StatusDetail { get; set; }
 
+    [ObservableProperty] public partial string NowTitle { get; set; }
+    [ObservableProperty] public partial string NowSubtitle { get; set; }
+    [ObservableProperty] public partial ImageSource? NowCover { get; set; }
+    [ObservableProperty] public partial double PositionSeconds { get; set; }
+    [ObservableProperty] public partial double DurationSeconds { get; set; }
+    [ObservableProperty] public partial bool IsPlaying { get; set; }
+
     public bool IsEmpty => !HasTracks && !IsBusy;
+
+    /// <summary>MediaElement 必须先存在于视觉树里，所以播放器由页面构造好再注入进来。</summary>
+    public void AttachPlayer(IAudioPlayer player)
+    {
+        _controller = new PlaybackController(player);
+        _controller.StateChanged += (_, _) => RefreshTransport();
+        _controller.PositionChanged += (_, position) =>
+        {
+            if (!_isDraggingProgress)
+            {
+                PositionSeconds = position.TotalSeconds;
+            }
+        };
+        _controller.PlaybackFailed += (_, message) =>
+        {
+            StatusMessage = "播放失败";
+            StatusDetail = message;
+        };
+        _controller.Volume = 0.8;
+    }
 
     [RelayCommand]
     private async Task ChooseFolderAsync()
@@ -69,6 +100,7 @@ public sealed partial class PlayerViewModel : ObservableObject
                 Tracks.Add(new TrackItem(track));
             }
 
+            _controller?.LoadTracks(tracks);
             HasTracks = Tracks.Count > 0;
 
             if (HasTracks)
@@ -91,7 +123,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     [RelayCommand]
     private void PlayTrack(TrackItem? item)
     {
-        if (item is null)
+        if (item is null || _controller is null || !_controller.PlayAt(Tracks.IndexOf(item)))
         {
             return;
         }
@@ -100,5 +132,75 @@ public sealed partial class PlayerViewModel : ObservableObject
         {
             track.IsCurrent = ReferenceEquals(track, item);
         }
+
+        RefreshTransport();
+    }
+
+    [RelayCommand]
+    private void TogglePlayPause()
+    {
+        _controller?.TogglePlayPause();
+        RefreshTransport();
+    }
+
+    [RelayCommand]
+    private void Next()
+    {
+        if (_controller?.Next() == true)
+        {
+            MarkCurrent();
+        }
+
+        RefreshTransport();
+    }
+
+    [RelayCommand]
+    private void Previous()
+    {
+        if (_controller?.Previous() == true)
+        {
+            MarkCurrent();
+        }
+
+        RefreshTransport();
+    }
+
+    public void BeginProgressDrag() => _isDraggingProgress = true;
+
+    public void CompleteProgressDrag(double seconds)
+    {
+        _isDraggingProgress = false;
+        _controller?.Seek(TimeSpan.FromSeconds(seconds));
+        RefreshTransport();
+    }
+
+    public void SetVolume(double value)
+    {
+        if (_controller is not null)
+        {
+            _controller.Volume = value;
+        }
+    }
+
+    private void MarkCurrent()
+    {
+        var path = _controller?.Current?.FilePath;
+        foreach (var track in Tracks)
+        {
+            track.IsCurrent = track.Track.FilePath == path;
+        }
+    }
+
+    private void RefreshTransport()
+    {
+        var current = _controller?.Current;
+        NowTitle = current?.DisplayTitle ?? string.Empty;
+        NowSubtitle = current is null ? string.Empty : $"{current.DisplayArtist} · {current.DisplayAlbum}";
+        IsPlaying = _controller?.State == PlaybackState.Playing;
+        DurationSeconds = Math.Max(1, _controller?.Duration.TotalSeconds ?? 1);
+        PositionSeconds = _controller?.Position.TotalSeconds ?? 0;
+        NowCover = current?.CoverArt is { Length: > 0 } bytes
+            ? ImageSource.FromStream(() => new MemoryStream(bytes))
+            : null;
     }
 }

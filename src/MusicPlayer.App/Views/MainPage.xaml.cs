@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using MusicPlayer.App.Services;
 using MusicPlayer.App.ViewModels;
 
 namespace MusicPlayer.App.Views;
@@ -8,19 +10,59 @@ public partial class MainPage : ContentPage
 
     public MainPage(PlayerViewModel viewModel)
     {
+        // 必须先赋值：XAML 里音量滑块的初始 Value 会立刻触发 ValueChanged
+        _viewModel = viewModel;
         InitializeComponent();
-        BindingContext = _viewModel = viewModel;
+        BindingContext = _viewModel;
+
+        // MediaElement 必须先存在于视觉树里才能播放，所以播放器在这里构造再注入
+        _viewModel.AttachPlayer(new MediaElementAudioPlayer(Media));
+
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         SizeChanged += OnSizeChanged;
     }
 
     private async void OnChooseFolderClicked(object? sender, EventArgs e)
         => await _viewModel.ChooseFolderCommand.ExecuteAsync(null);
 
-    /// <summary>窄窗口下把侧栏收成图标、隐藏文字（对应 spec 第 5 节）。</summary>
+    private void OnPlayPauseClicked(object? sender, EventArgs e) => _viewModel.TogglePlayPauseCommand.Execute(null);
+
+    private void OnNextClicked(object? sender, EventArgs e) => _viewModel.NextCommand.Execute(null);
+
+    private void OnPreviousClicked(object? sender, EventArgs e) => _viewModel.PreviousCommand.Execute(null);
+
+    private void OnProgressDragStarted(object? sender, EventArgs e) => _viewModel.BeginProgressDrag();
+
+    private void OnProgressDragCompleted(object? sender, EventArgs e)
+        => _viewModel.CompleteProgressDrag(ProgressSlider.Value);
+
+    private void OnVolumeChanged(object? sender, ValueChangedEventArgs e) => _viewModel.SetVolume(e.NewValue);
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(PlayerViewModel.PositionSeconds) or nameof(PlayerViewModel.DurationSeconds))
+        {
+            ProgressSlider.Maximum = Math.Max(1, _viewModel.DurationSeconds);
+            ProgressSlider.Value = Math.Clamp(_viewModel.PositionSeconds, 0, ProgressSlider.Maximum);
+            PositionLabel.Text = FormatSeconds(_viewModel.PositionSeconds);
+            DurationLabel.Text = FormatSeconds(_viewModel.DurationSeconds);
+        }
+
+        if (e.PropertyName is nameof(PlayerViewModel.IsPlaying))
+        {
+            PlayPauseButton.Text = _viewModel.IsPlaying ? "⏸" : "▶";
+        }
+    }
+
+    private static string FormatSeconds(double seconds)
+        => seconds <= 0 ? "0:00" : $"{(int)(seconds / 60)}:{(int)(seconds % 60):D2}";
+
+    /// <summary>窄窗口下把侧栏收成图标、隐藏音量（对应 spec 第 5 节）。</summary>
     private void OnSizeChanged(object? sender, EventArgs e)
     {
         var narrow = Width < 700;
         Sidebar.WidthRequest = narrow ? 48 : 132;
+        VolumeGroup.IsVisible = !narrow;
 
         foreach (var label in new[] { SidePlaying, SideLibrary, SideFolder, SidePlaylist, SideSettings })
         {
