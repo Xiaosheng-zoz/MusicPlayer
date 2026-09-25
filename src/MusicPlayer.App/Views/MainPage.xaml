@@ -130,10 +130,10 @@
           <Label x:Name="DurationLabel" Grid.Column="2" Text="--:--" FontSize="10" TextColor="#8B93A2" VerticalOptions="Center" />
         </Grid>
 
-        <Button Grid.Column="3" Text="{Binding PlayModeText}" Clicked="OnPlayModeClicked"
-                ToolTipProperties.Text="播放方式，点击切换：顺序 → 随机 → 单曲循环"
+        <Button Grid.Column="3" Text="{Binding PlayModeGlyph}" Clicked="OnPlayModeClicked"
+                ToolTipProperties.Text="{Binding PlayModeTooltip}"
                 BackgroundColor="Transparent" TextColor="#5B6270" BorderColor="#D8DEE9" BorderWidth="1"
-                FontSize="11" CornerRadius="6" Padding="8,4" HeightRequest="28" MinimumWidthRequest="48"
+                FontSize="13" CornerRadius="6" Padding="6,2" HeightRequest="30" MinimumWidthRequest="42"
                 VerticalOptions="Center" />
 
         <HorizontalStackLayout Grid.Column="4" x:Name="VolumeGroup" Spacing="7" VerticalOptions="Center">

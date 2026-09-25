@@ -103,14 +103,22 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] public partial bool IsPlaying { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PlayModeText))]
+    [NotifyPropertyChangedFor(nameof(PlayModeGlyph))]
+    [NotifyPropertyChangedFor(nameof(PlayModeTooltip))]
     public partial PlayMode Mode { get; set; }
 
-    public string PlayModeText => Mode switch
+    public string PlayModeGlyph => Mode switch
     {
-        PlayMode.Shuffle => "随机",
-        PlayMode.RepeatOne => "单曲",
-        _ => "顺序"
+        PlayMode.Shuffle => "🔀",
+        PlayMode.RepeatOne => "🔂",
+        _ => "➡️"
+    };
+
+    public string PlayModeTooltip => Mode switch
+    {
+        PlayMode.Shuffle => "随机播放 · 点击切换到单曲循环",
+        PlayMode.RepeatOne => "单曲循环 · 点击切换到顺序播放",
+        _ => "顺序播放 · 点击切换到随机播放"
     };
 
     public bool IsEmpty => !HasTracks && !IsBusy;
