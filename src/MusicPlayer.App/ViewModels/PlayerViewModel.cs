@@ -102,6 +102,17 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] public partial double DurationSeconds { get; set; }
     [ObservableProperty] public partial bool IsPlaying { get; set; }
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PlayModeText))]
+    public partial PlayMode Mode { get; set; }
+
+    public string PlayModeText => Mode switch
+    {
+        PlayMode.Shuffle => "随机",
+        PlayMode.RepeatOne => "单曲",
+        _ => "顺序"
+    };
+
     public bool IsEmpty => !HasTracks && !IsBusy;
 
     /// <summary>MediaElement 必须先存在于视觉树里，所以播放器由页面构造好再注入进来。</summary>
@@ -122,6 +133,7 @@ public sealed partial class PlayerViewModel : ObservableObject
             StatusDetail = message;
         };
         _controller.Volume = 0.8;
+        _controller.Mode = Mode;
     }
 
     [RelayCommand]
@@ -241,6 +253,23 @@ public sealed partial class PlayerViewModel : ObservableObject
         if (_controller is not null)
         {
             _controller.Volume = value;
+        }
+    }
+
+    /// <summary>顺序 → 随机 → 单曲 → 顺序，循环切换。</summary>
+    [RelayCommand]
+    private void CyclePlayMode()
+    {
+        Mode = Mode switch
+        {
+            PlayMode.Sequential => PlayMode.Shuffle,
+            PlayMode.Shuffle => PlayMode.RepeatOne,
+            _ => PlayMode.Sequential
+        };
+
+        if (_controller is not null)
+        {
+            _controller.Mode = Mode;
         }
     }
 

@@ -7,14 +7,17 @@ public sealed class PlaybackController
 {
     private readonly PlaybackQueue _queue = new();
     private readonly IAudioPlayer _player;
+    private readonly Func<int, int> _pickIndex;
     private int _failedAttempts;
     private bool _isTryingCurrent;
     private bool _loadFailed;
     private string _failureMessage = string.Empty;
 
-    public PlaybackController(IAudioPlayer player)
+    /// <param name="pickIndex">随机播放时用来挑索引，参数是上界（不含）。测试里注入可预测的实现。</param>
+    public PlaybackController(IAudioPlayer player, Func<int, int>? pickIndex = null)
     {
         _player = player;
+        _pickIndex = pickIndex ?? (maxExclusive => Random.Shared.Next(maxExclusive));
         _player.Ended += OnEnded;
         _player.Failed += OnFailed;
         _player.PositionChanged += (_, _) => PositionChanged?.Invoke(this, _player.Position);
@@ -29,6 +32,10 @@ public sealed class PlaybackController
 
     public IReadOnlyList<Track> Tracks => _queue.Tracks;
     public Track? Current => _queue.Current;
+
+    /// <summary>播放方式：顺序 / 随机 / 单曲循环。</summary>
+    public PlayMode Mode { get; set; } = PlayMode.Sequential;
+
     public PlaybackState State => _player.State;
     public TimeSpan Position => _player.Position;
     public TimeSpan Duration => _player.Duration;
@@ -47,6 +54,18 @@ public sealed class PlaybackController
 
     public bool PlayAt(int index)
     {
+        if (index < 0 || index >= _queue.Tracks.Count)
+        {
+            return false;
+        }
+
+        // 点的就是当前正在播的那一首：什么都不做。
+        // 否则一次双击会触发两次 PlayAt，第二次把这首歌从头重新加载。
+        if (index == _queue.CurrentIndex && _player.State == PlaybackState.Playing)
+        {
+            return true;
+        }
+
         if (_queue.SetCurrent(index) is null)
         {
             return false;
@@ -55,9 +74,37 @@ public sealed class PlaybackController
         return TryPlayCurrentSkippingBrokenFiles();
     }
 
-    public bool Next() => _queue.MoveNext() && TryPlayCurrentSkippingBrokenFiles();
+    public bool Next() => Mode == PlayMode.Shuffle
+        ? MoveShuffled()
+        : _queue.MoveNext() && TryPlayCurrentSkippingBrokenFiles();
 
-    public bool Previous() => _queue.MovePrevious() && TryPlayCurrentSkippingBrokenFiles();
+    public bool Previous() => Mode == PlayMode.Shuffle
+        ? MoveShuffled()
+        : _queue.MovePrevious() && TryPlayCurrentSkippingBrokenFiles();
+
+    /// <summary>
+    /// 随机换一首。从"除当前这首之外"的曲目里挑，所以不会连着播同一首；
+    /// 列表里只有一首时只能重播它。
+    /// </summary>
+    private bool MoveShuffled()
+    {
+        var count = _queue.Tracks.Count;
+        if (count == 0)
+        {
+            return false;
+        }
+
+        if (count == 1)
+        {
+            return TryPlayCurrentSkippingBrokenFiles();
+        }
+
+        var current = _queue.CurrentIndex < 0 ? 0 : _queue.CurrentIndex;
+        var offset = 1 + _pickIndex(count - 1);
+        var index = (current + offset) % count;
+
+        return _queue.SetCurrent(index) is not null && TryPlayCurrentSkippingBrokenFiles();
+    }
 
     public void TogglePlayPause()
     {
@@ -133,6 +180,13 @@ public sealed class PlaybackController
     private void OnEnded(object? sender, EventArgs e)
     {
         _failedAttempts = 0;
+
+        // 单曲循环：把当前这首重新放一遍（显式按上一首/下一首不受影响，仍走 Next/Previous）
+        if (Mode == PlayMode.RepeatOne && _queue.Current is not null)
+        {
+            TryPlayCurrentSkippingBrokenFiles();
+            return;
+        }
 
         if (!Next())
         {

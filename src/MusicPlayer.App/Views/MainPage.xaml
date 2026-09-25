@@ -100,7 +100,7 @@
 
       <!-- 底部播放条 -->
       <Grid Grid.Row="2" x:Name="TransportBar" HeightRequest="64" BackgroundColor="#FCFCFD"
-            Padding="14,0" ColumnDefinitions="190,Auto,*,96" ColumnSpacing="14">
+            Padding="14,0" ColumnDefinitions="190,Auto,*,Auto,96" ColumnSpacing="14">
 
         <HorizontalStackLayout Grid.Column="0" Spacing="9" VerticalOptions="Center">
           <Border WidthRequest="38" HeightRequest="38" StrokeThickness="0" BackgroundColor="#2F6FED">
@@ -130,7 +130,13 @@
           <Label x:Name="DurationLabel" Grid.Column="2" Text="--:--" FontSize="10" TextColor="#8B93A2" VerticalOptions="Center" />
         </Grid>
 
-        <HorizontalStackLayout Grid.Column="3" x:Name="VolumeGroup" Spacing="7" VerticalOptions="Center">
+        <Button Grid.Column="3" Text="{Binding PlayModeText}" Clicked="OnPlayModeClicked"
+                ToolTipProperties.Text="播放方式，点击切换：顺序 → 随机 → 单曲循环"
+                BackgroundColor="Transparent" TextColor="#5B6270" BorderColor="#D8DEE9" BorderWidth="1"
+                FontSize="11" CornerRadius="6" Padding="8,4" HeightRequest="28" MinimumWidthRequest="48"
+                VerticalOptions="Center" />
+
+        <HorizontalStackLayout Grid.Column="4" x:Name="VolumeGroup" Spacing="7" VerticalOptions="Center">
           <Label Text="🔊" FontSize="11" TextColor="#8B93A2" VerticalOptions="Center" />
           <Slider x:Name="VolumeSlider" Minimum="0" Maximum="1" Value="0.8"
                   MaximumTrackColor="#E2E6EE" MinimumTrackColor="#B9C3D4" ThumbColor="#B9C3D4"

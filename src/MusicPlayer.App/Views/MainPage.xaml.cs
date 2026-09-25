@@ -20,6 +20,10 @@ public partial class MainPage : ContentPage
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         SizeChanged += OnSizeChanged;
+
+#if WINDOWS
+        Loaded += (_, _) => HookSpaceKey();
+#endif
     }
 
     private async void OnChooseFolderClicked(object? sender, EventArgs e)
@@ -40,6 +44,46 @@ public partial class MainPage : ContentPage
         => _viewModel.CompleteProgressDrag(ProgressSlider.Value);
 
     private void OnVolumeChanged(object? sender, ValueChangedEventArgs e) => _viewModel.SetVolume(e.NewValue);
+
+    private void OnPlayModeClicked(object? sender, EventArgs e) => _viewModel.CyclePlayModeCommand.Execute(null);
+
+#if WINDOWS
+    /// <summary>把空格键接到播放/暂停上。</summary>
+    private void HookSpaceKey()
+    {
+        if (Window?.Handler?.PlatformView is not Microsoft.UI.Xaml.Window nativeWindow)
+        {
+            return;
+        }
+
+        if (nativeWindow.Content is not Microsoft.UI.Xaml.UIElement root)
+        {
+            return;
+        }
+
+        root.PreviewKeyDown -= OnNativePreviewKeyDown;
+        root.PreviewKeyDown += OnNativePreviewKeyDown;
+    }
+
+    private void OnNativePreviewKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+    {
+        if (e.Key != Windows.System.VirtualKey.Space)
+        {
+            return;
+        }
+
+        // 在输入框里空格得照常输入，不能被抢走
+        if (sender is Microsoft.UI.Xaml.FrameworkElement element
+            && Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(element.XamlRoot)
+                is Microsoft.UI.Xaml.Controls.TextBox)
+        {
+            return;
+        }
+
+        _viewModel.TogglePlayPauseCommand.Execute(null);
+        e.Handled = true;
+    }
+#endif
 
     private void OnRowPointerEntered(object? sender, PointerEventArgs e) => SetRowHovered(sender, true);
 
