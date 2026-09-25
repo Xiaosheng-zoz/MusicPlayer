@@ -104,11 +104,23 @@ jobs:
 
       - name: 编译探针（模拟器）
         run: |
-          set -euo pipefail
+          set -uo pipefail
           dotnet build spikes/IosProbe/IosProbe.csproj \
             -f net10.0-ios \
             -c Debug \
-            -p:RuntimeIdentifier="$RID"
+            -p:RuntimeIdentifier="$RID" 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+
+          # 把编译错误转成 GitHub 注解。注解未登录也能通过 API 读到，
+          # 而作业日志下载需要登录——这样排查就不用每次都靠人工复制日志。
+          echo "--- 编译错误摘要 ---"
+          grep -E 'error [A-Z]{2,}[0-9]+' build.log | sort -u | head -30 > errors.txt || true
+          cat errors.txt
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::error::${line}"
+          done < errors.txt
+
+          exit "$status"
 
       - name: 启动模拟器
         run: |
@@ -145,8 +157,17 @@ jobs:
             echo "✅ 探针通过：iOS 能读也能播 24bit/96k FLAC"
           else
             echo "❌ 探针未通过，看上面的输出"
-            exit 1
           fi
+
+          # 同样把探针的关键结果发成注解，方便远程读取
+          echo "--- 探针结果摘要 ---"
+          grep -E '^\[|播放位置推进到|item\.Status|结论:' probe-output.txt | head -30 > summary.txt || true
+          cat summary.txt
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::notice::${line}"
+          done < summary.txt
+
+          grep -q "结论: PASS" probe-output.txt
 
       - name: 保存日志
         if: always()
