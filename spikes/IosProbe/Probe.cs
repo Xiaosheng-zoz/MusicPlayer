@@ -70,7 +70,8 @@ public static class Probe
             player.Play();
             await Task.Delay(4000);
 
-            var position = player.CurrentTime().Seconds;
+            // 注意：.NET for iOS 把原生的 -(CMTime)currentTime 绑定成了属性，不是方法
+            var position = player.CurrentTime.Seconds;
             var item = player.CurrentItem;
 
             W("[3] AVFoundation 播放");
