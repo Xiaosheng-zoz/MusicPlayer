@@ -204,6 +204,37 @@ jobs:
             echo "RID: ${RID:-<未设置>}"
           } > .ci-logs/meta.txt
 
+          # 把构建里失败的那条 xcrun 调用原样复现，结果写进文件供远程读取。
+          # 构建报的是 xcrun 找不到工具（actool / install_name_tool），
+          # 而普通步骤里的 xcrun 查找是成功的——差别一定在环境上。
+          {
+            XC=$(xcode-select -p)
+            SDK="$XC/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+            echo "XCODE_DEV_DIR = $XC"
+            echo "SDK 路径     = $SDK"
+            ls -ld "$SDK" 2>&1 || echo "(该 SDK 路径不存在)"
+            ls -l "$XC/Platforms/MacOSX.platform/Developer/SDKs/" 2>&1 || true
+
+            echo ""
+            echo "### 原样复现：xcodebuild -sdk <macosx> -find actool"
+            "$XC/usr/bin/xcodebuild" -sdk "$SDK" -find actool 2>&1
+            echo "exit=$?"
+
+            echo ""
+            echo "### 变体"
+            xcrun --sdk macosx --find actool 2>&1;             echo "  exit=$?"
+            xcrun -find actool 2>&1;                           echo "  exit=$?"
+            xcrun --sdk iphonesimulator --find actool 2>&1;    echo "  exit=$?"
+            xcrun --sdk iphoneos --find install_name_tool 2>&1; echo "  exit=$?"
+            ls -l "$XC/usr/bin/actool" "$XC/usr/bin/install_name_tool" 2>&1 || true
+
+            echo ""
+            echo "### 环境"
+            echo "DEVELOPER_DIR=${DEVELOPER_DIR:-<未设置>}"
+            echo "PATH=$PATH"
+            echo "xcode-select -p = $(xcode-select -p)"
+          } > .ci-logs/xcode-diag.txt 2>&1
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B ci-logs
