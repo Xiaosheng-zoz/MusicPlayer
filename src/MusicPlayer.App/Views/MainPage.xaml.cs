@@ -65,7 +65,8 @@ public partial class MainPage : ContentPage
 
         if (e.PropertyName is nameof(PlayerViewModel.IsPlaying))
         {
-            PlayPauseButton.Text = _viewModel.IsPlaying ? "⏸" : "▶";
+            // 不要用 ⏸(U+23F8)：它默认走表情符号字体，会被画进一块彩色圆角底板里。
+            PlayPauseButton.Text = _viewModel.IsPlaying ? "▮▮" : "▶";
         }
     }
 
