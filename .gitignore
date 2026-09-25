@@ -1,0 +1,12 @@
+# 头脑风暴草稿与界面稿
+.superpowers/
+
+# .NET 构建产物
+bin/
+obj/
+
+# 编辑器
+.vs/
+.idea/
+*.user
+*.suo
