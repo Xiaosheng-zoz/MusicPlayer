@@ -1,0 +1,85 @@
+name: iOS 探针
+
+# 目的：在真实 macOS + iOS 模拟器上验证两件事
+#   1. iOS 能不能读我们的 24bit / 96kHz FLAC（TagLibSharp）
+#   2. iOS 能不能真的解码播放它（AVFoundation）—— 判据是播放位置推进，不是"文件被接受"
+# 模拟器跑在 macOS 上，用的是和真机同一套 FLAC 解码器，所以不需要 iPhone / Apple ID / 签名。
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'spikes/IosProbe/**'
+      - '.github/workflows/ios-probe.yml'
+
+jobs:
+  probe:
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: 安装 iOS 的 MAUI 工作负载
+        run: dotnet workload install maui-ios
+
+      - name: 环境信息
+        run: |
+          dotnet --version
+          xcodebuild -version
+          xcrun simctl list runtimes | head -20
+
+      - name: 编译探针（模拟器）
+        run: |
+          dotnet build spikes/IosProbe/IosProbe.csproj \
+            -f net10.0-ios \
+            -c Debug \
+            -p:RuntimeIdentifier=iossimulator-arm64
+
+      - name: 启动模拟器
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available -j \
+            | jq -r 'first(.devices[] | .[] | select(.name | test("iPhone")) | .udid)')
+          if [ -z "$DEVICE_ID" ] || [ "$DEVICE_ID" = "null" ]; then
+            echo "找不到可用的 iPhone 模拟器"; xcrun simctl list devices available; exit 1
+          fi
+          echo "DEVICE_ID=$DEVICE_ID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$DEVICE_ID" || true
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+
+      - name: 装进模拟器并运行探针
+        run: |
+          set -o pipefail
+          APP=$(find spikes/IosProbe/bin/Debug/net10.0-ios/iossimulator-arm64 \
+            -maxdepth 1 -name '*.app' | head -1)
+          if [ -z "$APP" ]; then
+            echo "没找到 .app"; find spikes/IosProbe/bin -maxdepth 4 -name '*.app'; exit 1
+          fi
+          echo "APP=$APP"
+          xcrun simctl install "$DEVICE_ID" "$APP"
+
+          # --console-pty 会把应用的 stdout 回传到这个步骤的日志里
+          xcrun simctl launch --console-pty "$DEVICE_ID" com.xszoz.iosprobe 2>&1 | tee probe-output.txt
+
+          echo "---------------- 探针输出 ----------------"
+          cat probe-output.txt
+          echo "------------------------------------------"
+
+          if grep -q "结论: PASS" probe-output.txt; then
+            echo "✅ 探针通过：iOS 能读也能播 24bit/96k FLAC"
+          else
+            echo "❌ 探针未通过，看上面的输出"
+            exit 1
+          fi
+
+      - name: 保存日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-probe-output
+          path: probe-output.txt
+          if-no-files-found: warn
