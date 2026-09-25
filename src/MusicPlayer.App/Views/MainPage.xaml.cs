@@ -146,7 +146,7 @@ public partial class MainPage : ContentPage
         Sidebar.WidthRequest = narrow ? 48 : 132;
         VolumeGroup.IsVisible = !narrow;
 
-        foreach (var label in new[] { SidePlaying, SideLibrary, SideFolder, SidePlaylist, SideSettings })
+        foreach (var label in new[] { SideMusic, SideFolders, SidePlaylist, SideSettings })
         {
             label.Text = narrow ? label.Text.Trim()[..1] : label.Text.Trim();
         }

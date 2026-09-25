@@ -14,7 +14,8 @@ namespace MusicPlayer.App.ViewModels;
 
 public enum AppSection
 {
-    Library,
+    Music,
+    Folders,
     Settings
 }
 
@@ -32,7 +33,10 @@ public sealed partial class TrackItem : ObservableObject
     }
 
     public Track Track { get; }
+
+    /// <summary>在整张库里的序号。搜索过滤后不会重新编号，序号始终对应库里的位置。</summary>
     public int Number { get; }
+
     public string Title => Track.DisplayTitle;
     public string Subtitle => Track.DisplaySubtitle;
     public string Duration => Track.DisplayDuration;
@@ -63,7 +67,7 @@ public sealed partial class TrackItem : ObservableObject
     [NotifyPropertyChangedFor(nameof(RowColor))]
     public partial bool IsHovered { get; set; }
 
-    /// <summary>行底色。正在播放优先于鼠标悬停，其余透明。</summary>
+    /// <summary>行底色。正在播放优先于鼠标悬停，其余白色。</summary>
     public Color RowColor => IsCurrent
         ? Color.FromArgb("#E7EEFC")
         : IsHovered
@@ -76,10 +80,14 @@ public sealed partial class PlayerViewModel : ObservableObject
     private readonly LibraryLoader _loader;
     private readonly ICoverArtReader _coverArt;
     private readonly IAppSettingsStore _settingsStore;
+
+    /// <summary>整张库。播放队列和序号都以它为准，搜索**不会**改动它。</summary>
+    private readonly List<TrackItem> _library = new();
+
     private AppSettings _settings = new();
-    private bool _initializing;
     private PlaybackController? _controller;
     private bool _isDraggingProgress;
+    private bool _initializing;
     private string _nowCoverPath = string.Empty;
 
     public PlayerViewModel(LibraryLoader loader, ICoverArtReader coverArt, IAppSettingsStore settingsStore)
@@ -87,12 +95,25 @@ public sealed partial class PlayerViewModel : ObservableObject
         _loader = loader;
         _coverArt = coverArt;
         _settingsStore = settingsStore;
+
         FolderPath = string.Empty;
-        StatusMessage = "还没有音乐";
-        StatusDetail = "点「浏览」选一个文件夹，或直接把路径粘贴到输入框里";
+        SearchText = string.Empty;
+        FolderStatusTitle = "还没有扫描过";
+        FolderStatusDetail = "选一个音乐文件夹，或者直接把路径粘进上面的输入框";
+        RefreshMusicStatus();
     }
 
-    public ObservableCollection<TrackItem> Tracks { get; } = new();
+    /// <summary>界面上显示的那一份，可能被搜索过滤过。</summary>
+    public ObservableCollection<TrackItem> VisibleTracks { get; } = new();
+
+    [ObservableProperty] public partial string FolderPath { get; set; }
+    [ObservableProperty] public partial string SearchText { get; set; }
+
+    [ObservableProperty] public partial string FolderStatusTitle { get; set; }
+    [ObservableProperty] public partial string FolderStatusDetail { get; set; }
+    [ObservableProperty] public partial string MusicStatusText { get; set; }
+    [ObservableProperty] public partial string MusicEmptyTitle { get; set; }
+    [ObservableProperty] public partial string MusicEmptyDetail { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEmpty))]
@@ -102,24 +123,30 @@ public sealed partial class PlayerViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsEmpty))]
     public partial bool IsBusy { get; set; }
 
-    [ObservableProperty] public partial string StatusMessage { get; set; }
-    [ObservableProperty] public partial string StatusDetail { get; set; }
-    [ObservableProperty] public partial string FolderPath { get; set; }
+    public bool IsEmpty => !IsBusy && VisibleTracks.Count == 0;
 
-    [ObservableProperty] public partial string NowTitle { get; set; }
-    [ObservableProperty] public partial string NowSubtitle { get; set; }
-    [ObservableProperty] public partial ImageSource? NowCover { get; set; }
-    [ObservableProperty] public partial double PositionSeconds { get; set; }
-    [ObservableProperty] public partial double DurationSeconds { get; set; }
-    [ObservableProperty] public partial bool IsPlaying { get; set; }
+    // ===== 分区切换 =====
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsLibrarySelected))]
+    [NotifyPropertyChangedFor(nameof(IsMusicSelected))]
+    [NotifyPropertyChangedFor(nameof(IsFoldersSelected))]
     [NotifyPropertyChangedFor(nameof(IsSettingsSelected))]
     public partial AppSection Section { get; set; }
 
-    public bool IsLibrarySelected => Section == AppSection.Library;
+    public bool IsMusicSelected => Section == AppSection.Music;
+    public bool IsFoldersSelected => Section == AppSection.Folders;
     public bool IsSettingsSelected => Section == AppSection.Settings;
+
+    [RelayCommand]
+    private void ShowMusic() => Section = AppSection.Music;
+
+    [RelayCommand]
+    private void ShowFolders() => Section = AppSection.Folders;
+
+    [RelayCommand]
+    private void ShowSettings() => Section = AppSection.Settings;
+
+    // ===== 设置 =====
 
     /// <summary>设置里那个开关：关掉就不再记住、也不再自动打开文件夹。</summary>
     [ObservableProperty]
@@ -132,34 +159,6 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     public string SettingsFilePath => $"设置文件：{_settingsStore.Location}";
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PlayModeGlyph))]
-    [NotifyPropertyChangedFor(nameof(PlayModeTooltip))]
-    public partial PlayMode Mode { get; set; }
-
-    public string PlayModeGlyph => Mode switch
-    {
-        PlayMode.Shuffle => "🔀",
-        PlayMode.RepeatOne => "🔂",
-        _ => "➡️"
-    };
-
-    public string PlayModeTooltip => Mode switch
-    {
-        PlayMode.Shuffle => "随机播放 · 点击切换到单曲循环",
-        PlayMode.RepeatOne => "单曲循环 · 点击切换到顺序播放",
-        _ => "顺序播放 · 点击切换到随机播放"
-    };
-
-    public bool IsEmpty => !HasTracks && !IsBusy;
-
-    [RelayCommand]
-    private void ShowLibrary() => Section = AppSection.Library;
-
-    [RelayCommand]
-    private void ShowSettings() => Section = AppSection.Settings;
-
-    /// <summary>启动时自动打开上次用过的文件夹。</summary>
     [RelayCommand]
     private async Task InitializeAsync()
     {
@@ -198,26 +197,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         _settingsStore.Save(_settings);
     }
 
-    /// <summary>MediaElement 必须先存在于视觉树里，所以播放器由页面构造好再注入进来。</summary>
-    public void AttachPlayer(IAudioPlayer player)
-    {
-        _controller = new PlaybackController(player);
-        _controller.StateChanged += (_, _) => RefreshTransport();
-        _controller.PositionChanged += (_, position) =>
-        {
-            if (!_isDraggingProgress)
-            {
-                PositionSeconds = position.TotalSeconds;
-            }
-        };
-        _controller.PlaybackFailed += (_, message) =>
-        {
-            StatusMessage = "播放失败";
-            StatusDetail = message;
-        };
-        _controller.Volume = 0.8;
-        _controller.Mode = Mode;
-    }
+    // ===== 扫描文件夹 =====
 
     [RelayCommand]
     private async Task ChooseFolderAsync()
@@ -232,22 +212,21 @@ public sealed partial class PlayerViewModel : ObservableObject
         catch (Exception ex)
         {
             DiagLog.Write($"PickAsync THREW: {ex}");
-            StatusMessage = "选择文件夹出错";
-            StatusDetail = ex.Message;
+            FolderStatusTitle = "选择文件夹出错";
+            FolderStatusDetail = ex.Message;
             return;
         }
 
         DiagLog.Write($"PickAsync: IsSuccessful={picked.IsSuccessful}, "
-           + $"Folder={picked.Folder?.Path ?? "<null>"}, "
-           + $"Exception={picked.Exception?.Message ?? "<none>"}, "
-           + $"ExceptionType={picked.Exception?.GetType().FullName ?? "<none>"}");
+                    + $"Folder={picked.Folder?.Path ?? "<null>"}, "
+                    + $"Exception={picked.Exception?.Message ?? "<none>"}");
 
         if (!picked.IsSuccessful || picked.Folder is null)
         {
-            // 不能静默返回：用户要么是放弃了，要么是没能让确认按钮亮起来，
+            // 不能静默返回：用户要么是放弃了，要么是没能让对话框里的确认按钮亮起来，
             // 两种都需要看到一句人话，否则界面看起来像坏了。
-            StatusMessage = "没有选到文件夹";
-            StatusDetail = picked.Exception?.Message ?? "对话框没有返回文件夹";
+            FolderStatusTitle = "没有选到文件夹";
+            FolderStatusDetail = picked.Exception?.Message ?? "对话框没有返回文件夹";
             return;
         }
 
@@ -262,8 +241,8 @@ public sealed partial class PlayerViewModel : ObservableObject
     private async Task LoadFolderAsync(string? path)
     {
         IsBusy = true;
-        StatusMessage = "正在扫描…";
-        StatusDetail = path ?? string.Empty;
+        FolderStatusTitle = "正在扫描…";
+        FolderStatusDetail = path ?? string.Empty;
 
         try
         {
@@ -273,16 +252,20 @@ public sealed partial class PlayerViewModel : ObservableObject
             DiagLog.Write($"[vm] Load: path={path}, count={result.Tracks.Count}, "
                         + $"elapsed={stopwatch.ElapsedMilliseconds} ms, msg={result.StatusMessage}");
 
-            Tracks.Clear();
+            _library.Clear();
             foreach (var track in result.Tracks)
             {
-                Tracks.Add(new TrackItem(track, Tracks.Count + 1, () => _coverArt.ReadCoverArt(track.FilePath)));
+                _library.Add(new TrackItem(track, _library.Count + 1, () => _coverArt.ReadCoverArt(track.FilePath)));
             }
 
             _controller?.LoadTracks(result.Tracks);
-            HasTracks = Tracks.Count > 0;
-            StatusMessage = result.StatusMessage;
-            StatusDetail = result.StatusDetail;
+            HasTracks = _library.Count > 0;
+
+            // 文件夹那一栏只报数量，列表在「音乐」里
+            FolderStatusTitle = result.StatusMessage;
+            FolderStatusDetail = result.StatusDetail;
+
+            ApplyFilter();
 
             // 只记住真实存在的文件夹：路径打错不该被记下来，否则下次启动就自动报错
             if (result.FolderExists && path is not null)
@@ -302,10 +285,99 @@ public sealed partial class PlayerViewModel : ObservableObject
         }
     }
 
+    // ===== 搜索 =====
+
+    partial void OnSearchTextChanged(string value) => ApplyFilter();
+
+    private void ApplyFilter()
+    {
+        VisibleTracks.Clear();
+        foreach (var item in _library)
+        {
+            if (TrackSearch.Matches(item.Track, SearchText))
+            {
+                VisibleTracks.Add(item);
+            }
+        }
+
+        OnPropertyChanged(nameof(IsEmpty));
+        RefreshMusicStatus();
+    }
+
+    private void RefreshMusicStatus()
+    {
+        if (!HasTracks)
+        {
+            MusicStatusText = "还没有音乐";
+            MusicEmptyTitle = "还没有音乐";
+            MusicEmptyDetail = "到左边的「文件夹」里选一个文件夹";
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            MusicStatusText = $"找到 {VisibleTracks.Count} 首";
+            MusicEmptyTitle = "没有匹配的歌";
+            MusicEmptyDetail = $"没有歌名或歌手包含「{SearchText.Trim()}」";
+            return;
+        }
+
+        MusicStatusText = $"{_library.Count} 首";
+        MusicEmptyTitle = string.Empty;
+        MusicEmptyDetail = string.Empty;
+    }
+
+    // ===== 播放 =====
+
+    [ObservableProperty] public partial string NowTitle { get; set; }
+    [ObservableProperty] public partial string NowSubtitle { get; set; }
+    [ObservableProperty] public partial ImageSource? NowCover { get; set; }
+    [ObservableProperty] public partial double PositionSeconds { get; set; }
+    [ObservableProperty] public partial double DurationSeconds { get; set; }
+    [ObservableProperty] public partial bool IsPlaying { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PlayModeGlyph))]
+    [NotifyPropertyChangedFor(nameof(PlayModeTooltip))]
+    public partial PlayMode Mode { get; set; }
+
+    public string PlayModeGlyph => Mode switch
+    {
+        PlayMode.Shuffle => "🔀",
+        PlayMode.RepeatOne => "🔂",
+        _ => "➡️"
+    };
+
+    public string PlayModeTooltip => Mode switch
+    {
+        PlayMode.Shuffle => "随机播放 · 点击切换到单曲循环",
+        PlayMode.RepeatOne => "单曲循环 · 点击切换到顺序播放",
+        _ => "顺序播放 · 点击切换到随机播放"
+    };
+
+    /// <summary>MediaElement 必须先存在于视觉树里，所以播放器由页面构造好再注入进来。</summary>
+    public void AttachPlayer(IAudioPlayer player)
+    {
+        _controller = new PlaybackController(player);
+        _controller.StateChanged += (_, _) => RefreshTransport();
+        _controller.PositionChanged += (_, position) =>
+        {
+            if (!_isDraggingProgress)
+            {
+                PositionSeconds = position.TotalSeconds;
+            }
+        };
+        _controller.PlaybackFailed += (_, message) => MusicStatusText = $"播放失败：{message}";
+        _controller.Volume = 0.8;
+        _controller.Mode = Mode;
+    }
+
     [RelayCommand]
     private void PlayTrack(TrackItem? item)
     {
-        if (item is null || _controller is null || !_controller.PlayAt(Tracks.IndexOf(item)))
+        // 注意：索引用的是整张库（_library），不是搜索后的 VisibleTracks，
+        // 否则搜到第 3 条、点它，播的会是队列里的第 3 首而不是它。
+        if (item is null || _controller is null || !_controller.PlayAt(_library.IndexOf(item)))
         {
             return;
         }
@@ -334,23 +406,6 @@ public sealed partial class PlayerViewModel : ObservableObject
         RefreshTransport();
     }
 
-    public void BeginProgressDrag() => _isDraggingProgress = true;
-
-    public void CompleteProgressDrag(double seconds)
-    {
-        _isDraggingProgress = false;
-        _controller?.Seek(TimeSpan.FromSeconds(seconds));
-        RefreshTransport();
-    }
-
-    public void SetVolume(double value)
-    {
-        if (_controller is not null)
-        {
-            _controller.Volume = value;
-        }
-    }
-
     /// <summary>顺序 → 随机 → 单曲 → 顺序，循环切换。</summary>
     [RelayCommand]
     private void CyclePlayMode()
@@ -368,10 +423,27 @@ public sealed partial class PlayerViewModel : ObservableObject
         }
     }
 
+    public void BeginProgressDrag() => _isDraggingProgress = true;
+
+    public void CompleteProgressDrag(double seconds)
+    {
+        _isDraggingProgress = false;
+        _controller?.Seek(TimeSpan.FromSeconds(seconds));
+        RefreshTransport();
+    }
+
+    public void SetVolume(double value)
+    {
+        if (_controller is not null)
+        {
+            _controller.Volume = value;
+        }
+    }
+
     private void MarkCurrent()
     {
         var path = _controller?.Current?.FilePath;
-        foreach (var track in Tracks)
+        foreach (var track in _library)
         {
             track.IsCurrent = track.Track.FilePath == path;
         }
@@ -381,16 +453,18 @@ public sealed partial class PlayerViewModel : ObservableObject
     {
         var current = _controller?.Current;
         var durationSeconds = Math.Max(1, _controller?.Duration.TotalSeconds ?? 1);
+
         DiagLog.Write($"[vm] RefreshTransport state={_controller?.State}, "
                     + $"dur={_controller?.Duration}, durSeconds={durationSeconds}, "
-                    + $"field DurationSeconds={DurationSeconds}, "
                     + $"title={current?.DisplayTitle ?? "<null>"}");
+
         NowTitle = current?.DisplayTitle ?? string.Empty;
         // 播放条只显示歌名和歌手，不显示专辑
         NowSubtitle = current?.DisplayArtist ?? string.Empty;
         IsPlaying = _controller?.State == PlaybackState.Playing;
         DurationSeconds = durationSeconds;
         PositionSeconds = _controller?.Position.TotalSeconds ?? 0;
+
         // 播放条封面也按需读，并且只在换歌时才读一次
         var coverPath = current?.FilePath ?? string.Empty;
         if (_nowCoverPath != coverPath)

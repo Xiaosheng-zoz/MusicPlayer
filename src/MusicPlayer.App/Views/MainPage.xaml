@@ -18,24 +18,34 @@
                           ShouldAutoPlay="False"
                           ShouldShowPlaybackControls="False" />
 
-    <!-- 侧栏：资料库与设置可用，其余按最终形态占位但禁用 -->
+    <!-- 侧栏：音乐 / 文件夹 / 设置可用，歌单按最终形态占位但禁用 -->
     <VerticalStackLayout Grid.Column="0" x:Name="Sidebar"
                          BackgroundColor="#F5F6F8" Padding="8,10" Spacing="2">
-      <Label x:Name="SidePlaying" Text="▶   正在播放" Padding="9,7" FontSize="11.5" TextColor="#5B6270" Opacity="0.45" />
 
-      <Label x:Name="SideLibrary" Text="♪   资料库" Padding="9,7" FontSize="11.5" TextColor="#5B6270">
+      <Label x:Name="SideMusic" Text="♪   音乐" Padding="9,7" FontSize="11.5" TextColor="#5B6270">
         <Label.GestureRecognizers>
-          <TapGestureRecognizer Command="{Binding ShowLibraryCommand}" />
+          <TapGestureRecognizer Command="{Binding ShowMusicCommand}" />
         </Label.GestureRecognizers>
         <Label.Triggers>
-          <DataTrigger TargetType="Label" Binding="{Binding IsLibrarySelected}" Value="True">
+          <DataTrigger TargetType="Label" Binding="{Binding IsMusicSelected}" Value="True">
             <Setter Property="BackgroundColor" Value="#E7EEFC" />
             <Setter Property="TextColor" Value="#2F6FED" />
           </DataTrigger>
         </Label.Triggers>
       </Label>
 
-      <Label x:Name="SideFolder" Text="▤   文件夹" Padding="9,7" FontSize="11.5" TextColor="#5B6270" Opacity="0.45" />
+      <Label x:Name="SideFolders" Text="▤   文件夹" Padding="9,7" FontSize="11.5" TextColor="#5B6270">
+        <Label.GestureRecognizers>
+          <TapGestureRecognizer Command="{Binding ShowFoldersCommand}" />
+        </Label.GestureRecognizers>
+        <Label.Triggers>
+          <DataTrigger TargetType="Label" Binding="{Binding IsFoldersSelected}" Value="True">
+            <Setter Property="BackgroundColor" Value="#E7EEFC" />
+            <Setter Property="TextColor" Value="#2F6FED" />
+          </DataTrigger>
+        </Label.Triggers>
+      </Label>
+
       <Label x:Name="SidePlaylist" Text="≡   歌单" Padding="9,7" FontSize="11.5" TextColor="#5B6270" Opacity="0.45" />
 
       <Label x:Name="SideSettings" Text="⚙   设置" Padding="9,7" FontSize="11.5" TextColor="#5B6270" VerticalOptions="End">
@@ -53,31 +63,17 @@
 
     <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto">
 
-      <!-- ===== 资料库视图 ===== -->
-      <Grid Grid.Row="0" Grid.RowSpan="2" RowDefinitions="Auto,*" IsVisible="{Binding IsLibrarySelected}">
+      <!-- ===== 音乐：搜索栏 + 歌曲列表 ===== -->
+      <Grid Grid.Row="0" Grid.RowSpan="2" RowDefinitions="Auto,*" IsVisible="{Binding IsMusicSelected}">
 
-        <VerticalStackLayout Grid.Row="0" Padding="16,12,16,10" Spacing="8">
-          <HorizontalStackLayout Spacing="10">
-            <Label Text="{Binding StatusMessage}" FontSize="14" FontAttributes="Bold"
-                   TextColor="#1B1D22" VerticalOptions="Center" />
-            <Label Text="{Binding StatusDetail}" FontSize="10.5" TextColor="#8B93A2"
-                   VerticalOptions="Center" LineBreakMode="TailTruncation" />
-          </HorizontalStackLayout>
-
-          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-            <Entry Grid.Column="0" Text="{Binding FolderPath}" Completed="OnFolderPathCompleted"
-                   Placeholder="音乐文件夹路径，例如 E:\LocalMusic"
-                   FontSize="11.5" TextColor="#1B1D22" PlaceholderColor="#9AA1AF"
-                   ClearButtonVisibility="WhileEditing" HeightRequest="34" />
-            <Button Grid.Column="1" Text="打开" Command="{Binding OpenFolderCommand}" HeightRequest="34"
-                    BackgroundColor="#2F6FED" TextColor="#FFFFFF" FontSize="12" CornerRadius="8" Padding="14,6" />
-            <Button Grid.Column="2" Text="浏览…" Clicked="OnChooseFolderClicked" HeightRequest="34"
-                    BackgroundColor="Transparent" TextColor="#2F6FED" BorderColor="#2F6FED" BorderWidth="1"
-                    FontSize="12" CornerRadius="8" Padding="14,6" />
-          </Grid>
+        <VerticalStackLayout Grid.Row="0" Padding="16,12,16,8" Spacing="6">
+          <Entry Text="{Binding SearchText}" Placeholder="搜索歌名或歌手"
+                 FontSize="12.5" TextColor="#1B1D22" PlaceholderColor="#9AA1AF"
+                 ClearButtonVisibility="WhileEditing" HeightRequest="36" />
+          <Label Text="{Binding MusicStatusText}" FontSize="10.5" TextColor="#8B93A2" />
         </VerticalStackLayout>
 
-        <CollectionView Grid.Row="1" ItemsSource="{Binding Tracks}" SelectionMode="None" Margin="8,0">
+        <CollectionView Grid.Row="1" ItemsSource="{Binding VisibleTracks}" SelectionMode="None" Margin="8,0">
           <CollectionView.ItemTemplate>
             <DataTemplate x:DataType="vm:TrackItem">
               <Grid Padding="6,0,10,0" HeightRequest="50" ColumnDefinitions="30,34,*,48" ColumnSpacing="9"
@@ -115,14 +111,45 @@
         <VerticalStackLayout Grid.Row="1" IsVisible="{Binding IsEmpty}"
                              VerticalOptions="Center" HorizontalOptions="Center" Spacing="8">
           <Label Text="♫" FontSize="30" HorizontalOptions="Center" Opacity="0.3" />
-          <Label Text="{Binding StatusMessage}" FontSize="13.5" FontAttributes="Bold" HorizontalOptions="Center" />
-          <Label Text="{Binding StatusDetail}" FontSize="11.5" TextColor="#8B93A2" HorizontalOptions="Center" />
-          <Button Text="选择文件夹" Clicked="OnChooseFolderClicked" BackgroundColor="#2F6FED"
+          <Label Text="{Binding MusicEmptyTitle}" FontSize="13.5" FontAttributes="Bold" HorizontalOptions="Center" />
+          <Label Text="{Binding MusicEmptyDetail}" FontSize="11.5" TextColor="#8B93A2" HorizontalOptions="Center" />
+          <Button Text="去选文件夹" Command="{Binding ShowFoldersCommand}" BackgroundColor="#2F6FED"
                   TextColor="#FFFFFF" FontSize="12" CornerRadius="8" Padding="18,9" HorizontalOptions="Center" />
         </VerticalStackLayout>
       </Grid>
 
-      <!-- ===== 设置视图 ===== -->
+      <!-- ===== 文件夹：只管扫描，只报数量 ===== -->
+      <VerticalStackLayout Grid.Row="0" Grid.RowSpan="2" IsVisible="{Binding IsFoldersSelected}"
+                           Padding="20,16" Spacing="14">
+        <Label Text="文件夹" FontSize="16" FontAttributes="Bold" TextColor="#1B1D22" />
+
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+          <Entry Grid.Column="0" Text="{Binding FolderPath}" Completed="OnFolderPathCompleted"
+                 Placeholder="音乐文件夹路径，例如 E:\LocalMusic"
+                 FontSize="11.5" TextColor="#1B1D22" PlaceholderColor="#9AA1AF"
+                 ClearButtonVisibility="WhileEditing" HeightRequest="36" />
+          <Button Grid.Column="1" Text="打开" Command="{Binding OpenFolderCommand}" HeightRequest="36"
+                  BackgroundColor="#2F6FED" TextColor="#FFFFFF" FontSize="12" CornerRadius="8" Padding="14,6" />
+          <Button Grid.Column="2" Text="浏览…" Clicked="OnChooseFolderClicked" HeightRequest="36"
+                  BackgroundColor="Transparent" TextColor="#2F6FED" BorderColor="#2F6FED" BorderWidth="1"
+                  FontSize="12" CornerRadius="8" Padding="14,6" />
+        </Grid>
+
+        <Border BackgroundColor="#F7F9FC" StrokeThickness="0" Padding="16,14">
+          <Border.StrokeShape>
+            <RoundRectangle CornerRadius="8" />
+          </Border.StrokeShape>
+          <VerticalStackLayout Spacing="4">
+            <Label Text="{Binding FolderStatusTitle}" FontSize="22" FontAttributes="Bold" TextColor="#1B1D22" />
+            <Label Text="{Binding FolderStatusDetail}" FontSize="10.5" TextColor="#8B93A2" LineBreakMode="TailTruncation" />
+          </VerticalStackLayout>
+        </Border>
+
+        <Label Text="扫描结果只在这里显示数量，歌曲列表在左边的「音乐」里。"
+               FontSize="10" TextColor="#9AA1AF" />
+      </VerticalStackLayout>
+
+      <!-- ===== 设置 ===== -->
       <VerticalStackLayout Grid.Row="0" Grid.RowSpan="2" IsVisible="{Binding IsSettingsSelected}"
                            Padding="20,16" Spacing="16">
         <Label Text="设置" FontSize="16" FontAttributes="Bold" TextColor="#1B1D22" />
@@ -144,7 +171,7 @@
         <Label Text="{Binding SettingsFilePath}" FontSize="10" TextColor="#9AA1AF" />
       </VerticalStackLayout>
 
-      <!-- ===== 底部播放条（两个视图下都在） ===== -->
+      <!-- ===== 底部播放条（各视图下都在） ===== -->
       <Grid Grid.Row="2" x:Name="TransportBar" HeightRequest="64" BackgroundColor="#FCFCFD"
             Padding="14,0" ColumnDefinitions="190,Auto,*,Auto,96" ColumnSpacing="14">
 

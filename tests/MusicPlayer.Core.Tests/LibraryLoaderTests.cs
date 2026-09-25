@@ -63,8 +63,9 @@ public class LibraryLoaderTests : IDisposable
         var result = await CreateLoader().LoadAsync(_root);
 
         Assert.Equal(2, result.Tracks.Count);
-        Assert.Equal("全部歌曲", result.StatusMessage);
-        Assert.Contains("2", result.StatusDetail);
+        // 文件夹那一栏只需要报个数量，列表本身在「音乐」里
+        Assert.Equal("2 首", result.StatusMessage);
+        Assert.Equal(_root, result.StatusDetail);
     }
 
     [Fact]

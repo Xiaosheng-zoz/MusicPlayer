@@ -33,6 +33,6 @@ public sealed class LibraryLoader
 
         return tracks.Count == 0
             ? new LibraryLoadResult(tracks, "这个文件夹里没有 MP3 或 FLAC", path, FolderExists: true)
-            : new LibraryLoadResult(tracks, "全部歌曲", $"{tracks.Count} 首 · {path}", FolderExists: true);
+            : new LibraryLoadResult(tracks, $"{tracks.Count} 首", path, FolderExists: true);
     }
 }
