@@ -4,6 +4,10 @@ name: iOS 探针
 #   1. iOS 能不能读我们的 24bit / 96kHz FLAC（TagLibSharp）
 #   2. iOS 能不能真的解码播放它（AVFoundation）—— 判据是播放位置推进，不是"文件被接受"
 # 模拟器跑在 macOS 上，用的是和真机同一套 FLAC 解码器，所以不需要 iPhone / Apple ID / 签名。
+#
+# 探针刻意不用 MAUI：MAUI 的资源系统会调用 actool，而 CI 镜像上的 Xcode 26.6
+# 调 actool 会失败（xcrun 那次查找调用返回 EINVAL）。不用 MAUI 就不碰 actool，
+# 而 TagLib 与 AVFoundation 与技术结论无关，用最朴素的 UIKit 应用照样能验。
 
 on:
   workflow_dispatch:
@@ -31,8 +35,8 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: 安装 iOS 的 MAUI 工作负载
-        run: dotnet workload install maui-ios
+      - name: 安装 iOS 工作负载
+        run: dotnet workload install ios
 
       - name: 选定 Xcode 并算出模拟器 RID
         run: |

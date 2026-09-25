@@ -33,10 +33,16 @@ public static class Probe
         string samplePath;
         try
         {
-            using var source = await FileSystem.OpenAppPackageFileAsync(SampleName);
-            samplePath = Path.Combine(FileSystem.CacheDirectory, SampleName);
-            using var destination = File.Create(samplePath);
-            await source.CopyToAsync(destination);
+            var bundled = NSBundle.MainBundle.PathForResource("sample-24bit96k", "flac");
+            if (bundled is null)
+            {
+                W("[1] 失败：应用包里找不到 sample-24bit96k.flac");
+                W("结论: FAIL");
+                return 1;
+            }
+
+            samplePath = Path.Combine(Path.GetTempPath(), SampleName);
+            File.Copy(bundled, samplePath, overwrite: true);
             W($"[1] 随包样本已解出 {new FileInfo(samplePath).Length / 1024.0 / 1024.0:F2} MB");
         }
         catch (Exception ex)
