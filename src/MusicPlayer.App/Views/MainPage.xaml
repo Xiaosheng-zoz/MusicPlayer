@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:MusicPlayer.App.ViewModels"
+             x:Class="MusicPlayer.App.Views.MainPage"
+             x:Name="PageRoot"
+             Title="音乐播放器"
+             BackgroundColor="#FFFFFF">
+
+  <Grid ColumnDefinitions="132,*" x:Name="RootGrid">
+
+    <!-- 侧栏：本阶段只有"资料库"是活的，其余按最终形态摆好但禁用 -->
+    <VerticalStackLayout Grid.Column="0" x:Name="Sidebar"
+                         BackgroundColor="#F5F6F8" Padding="8,10" Spacing="2">
+      <Label x:Name="SidePlaying"  Text="▶   正在播放" Padding="9,7" FontSize="11.5" TextColor="#5B6270" Opacity="0.45" />
+      <Label x:Name="SideLibrary"  Text="♪   资料库"   Padding="9,7" FontSize="11.5" TextColor="#2F6FED" BackgroundColor="#E7EEFC" />
+      <Label x:Name="SideFolder"   Text="▤   文件夹"   Padding="9,7" FontSize="11.5" TextColor="#5B6270" Opacity="0.45" />
+      <Label x:Name="SidePlaylist" Text="≡   歌单"     Padding="9,7" FontSize="11.5" TextColor="#5B6270" Opacity="0.45" />
+      <Label x:Name="SideSettings" Text="⚙   设置"     Padding="9,7" FontSize="11.5" TextColor="#5B6270" Opacity="0.45" VerticalOptions="End" />
+    </VerticalStackLayout>
+
+    <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto">
+
+      <!-- 顶部工具条 -->
+      <Grid Grid.Row="0" Padding="16,12,16,10" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+        <Label Grid.Column="0" Text="{Binding StatusMessage}" FontSize="14" FontAttributes="Bold"
+               TextColor="#1B1D22" VerticalOptions="Center" />
+        <Label Grid.Column="1" Text="{Binding StatusDetail}" FontSize="10.5" TextColor="#8B93A2"
+               VerticalOptions="Center" LineBreakMode="TailTruncation" />
+        <Button Grid.Column="2" Text="选择文件夹" Clicked="OnChooseFolderClicked"
+                BackgroundColor="#2F6FED" TextColor="#FFFFFF" FontSize="12" CornerRadius="8" Padding="14,8" />
+      </Grid>
+
+      <!-- 歌曲列表 -->
+      <CollectionView Grid.Row="1" ItemsSource="{Binding Tracks}" SelectionMode="None" Margin="8,0">
+        <CollectionView.ItemTemplate>
+          <DataTemplate x:DataType="vm:TrackItem">
+            <Grid Padding="10,0" HeightRequest="50" ColumnDefinitions="34,*,48" ColumnSpacing="11">
+              <Grid.Triggers>
+                <DataTrigger TargetType="Grid" Binding="{Binding IsCurrent}" Value="True">
+                  <Setter Property="BackgroundColor" Value="#E7EEFC" />
+                </DataTrigger>
+              </Grid.Triggers>
+
+              <Border Grid.Column="0" WidthRequest="34" HeightRequest="34" StrokeThickness="0"
+                      BackgroundColor="#2F6FED" Opacity="0.45">
+                <Border.StrokeShape>
+                  <RoundRectangle CornerRadius="6" />
+                </Border.StrokeShape>
+              </Border>
+
+              <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="1">
+                <Label Text="{Binding Title}" FontSize="12" FontAttributes="Bold" TextColor="#1B1D22" LineBreakMode="TailTruncation" />
+                <Label Text="{Binding Subtitle}" FontSize="10.5" TextColor="#8B93A2" LineBreakMode="TailTruncation" />
+              </VerticalStackLayout>
+
+              <Label Grid.Column="2" Text="{Binding Duration}" FontSize="11" TextColor="#8B93A2"
+                     VerticalOptions="Center" HorizontalTextAlignment="End" />
+            </Grid>
+          </DataTemplate>
+        </CollectionView.ItemTemplate>
+      </CollectionView>
+
+      <!-- 空状态 -->
+      <VerticalStackLayout Grid.Row="1" IsVisible="{Binding IsEmpty}"
+                           VerticalOptions="Center" HorizontalOptions="Center" Spacing="8">
+        <Label Text="♫" FontSize="30" HorizontalOptions="Center" Opacity="0.3" />
+        <Label Text="{Binding StatusMessage}" FontSize="13.5" FontAttributes="Bold" HorizontalOptions="Center" />
+        <Label Text="{Binding StatusDetail}" FontSize="11.5" TextColor="#8B93A2" HorizontalOptions="Center" />
+        <Button Text="选择文件夹" Clicked="OnChooseFolderClicked" BackgroundColor="#2F6FED"
+                TextColor="#FFFFFF" FontSize="12" CornerRadius="8" Padding="18,9" HorizontalOptions="Center" />
+      </VerticalStackLayout>
+
+      <!-- 播放条占位，Task 7 填内容 -->
+      <Grid Grid.Row="2" x:Name="TransportBar" HeightRequest="64" BackgroundColor="#FCFCFD" />
+
+    </Grid>
+  </Grid>
+</ContentPage>

@@ -20,7 +20,7 @@
 - 界面配色：强调色 `#2F6FED`，侧栏底色 `#F5F6F8`，次级文字 `#8B93A2`
 - 窗口最小尺寸 480 × 520
 - 只装 `maui-windows` 工作负载，不要装完整的 `maui`
-- NuGet 包一律安装最新稳定版（`dotnet add package <id>`，不带版本号）
+- NuGet 包的版本以"能配当前 MAUI 工作负载"为准。实测：`maui-windows` 工作负载给的是 `Microsoft.Maui.Controls 10.0.20`，而 `CommunityToolkit.Maui 14.x+` 要求 `Controls >= 10.0.30`、`15.x` 要求 `>= 10.0.90`，直接装最新会撞 NU1605 包降级。所以**必须钉版本**：`CommunityToolkit.Maui 13.0.0` + `CommunityToolkit.Maui.MediaElement 7.0.0`（两者都只要求 `Controls 10.0.10`）。`CommunityToolkit.Mvvm` 不依赖 MAUI，可以装最新
 
 ## 文件结构
 
@@ -1321,20 +1321,24 @@ dotnet sln add src/MusicPlayer.App/MusicPlayer.App.csproj
 <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
 ```
 
-删掉用不到的平台目录：
+删掉用不到的平台目录。受限环境可能拦截删除命令，替代做法是把它们移出项目目录（`.superpowers/` 已被 gitignore），效果相同：
 
 ```powershell
-Remove-Item -Recurse -Force src/MusicPlayer.App/Platforms/Android, src/MusicPlayer.App/Platforms/iOS, src/MusicPlayer.App/Platforms/MacCatalyst, src/MusicPlayer.App/Platforms/Tizen
+$scratch = 'E:\code\MusicPlayer\.superpowers\scratch\template-removed'
+New-Item -ItemType Directory -Force -Path $scratch | Out-Null
+Move-Item 'src/MusicPlayer.App/Platforms/Android','src/MusicPlayer.App/Platforms/iOS','src/MusicPlayer.App/Platforms/MacCatalyst','src/MusicPlayer.App/Platforms/Tizen' -Destination $scratch -Force
 ```
 
 - [ ] **Step 3: 加包引用**
 
 ```powershell
 dotnet add src/MusicPlayer.App package CommunityToolkit.Mvvm
-dotnet add src/MusicPlayer.App package CommunityToolkit.Maui
-dotnet add src/MusicPlayer.App package CommunityToolkit.Maui.MediaElement
+dotnet add src/MusicPlayer.App package CommunityToolkit.Maui --version 13.0.0
+dotnet add src/MusicPlayer.App package CommunityToolkit.Maui.MediaElement --version 7.0.0
 dotnet add src/MusicPlayer.App reference src/MusicPlayer.Core/MusicPlayer.Core.csproj
 ```
+
+装完之后 `dotnet build` 会报 `MCT001` / `MCTME001`：`.UseMauiCommunityToolkit()` 和 `.UseMauiCommunityToolkitMediaElement()` 必须链在 `.UseMauiApp<T>()` 上。这是分析器在提醒你还没做 Step 7 的初始化，不是配置错误，Step 7 完成后即消失。**不要用 NoWarn 把它压掉。**
 
 - [ ] **Step 4: 确认模板项目能编译**
 
@@ -1368,27 +1372,32 @@ public sealed partial class TrackItem : ObservableObject
     public string Duration => Track.DisplayDuration;
 
     [ObservableProperty]
-    private bool _isCurrent;
+    public partial bool IsCurrent { get; set; }
 }
 
 public sealed partial class PlayerViewModel : ObservableObject
 {
     private readonly ILibraryScanner _scanner;
 
-    public PlayerViewModel(ILibraryScanner scanner) => _scanner = scanner;
+    public PlayerViewModel(ILibraryScanner scanner)
+    {
+        _scanner = scanner;
+        StatusMessage = "还没有音乐";
+        StatusDetail = "选一个存放音乐的文件夹，支持 MP3 和 FLAC";
+    }
 
     public ObservableCollection<TrackItem> Tracks { get; } = new();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEmpty))]
-    private bool _hasTracks;
+    public partial bool HasTracks { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEmpty))]
-    private bool _isBusy;
+    public partial bool IsBusy { get; set; }
 
-    [ObservableProperty] private string _statusMessage = "还没有音乐";
-    [ObservableProperty] private string _statusDetail = "选一个存放音乐的文件夹，支持 MP3 和 FLAC";
+    [ObservableProperty] public partial string StatusMessage { get; set; }
+    [ObservableProperty] public partial string StatusDetail { get; set; }
 
     public bool IsEmpty => !HasTracks && !IsBusy;
 
@@ -1449,6 +1458,8 @@ public sealed partial class PlayerViewModel : ObservableObject
     }
 }
 ```
+
+> 注意 `[ObservableProperty]` 用的是**分部属性**而不是字段。标在字段上会触发 6 个 `MVVMTK0045` 警告（在 WinUI 里生成的代码不兼容 AOT）。分部属性没有初始化器，所以初始值改到构造函数里设。这需要 C# 13+，本项目是 .NET 10（C# 14），满足。
 
 - [ ] **Step 6: 写主界面**
 
