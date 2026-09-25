@@ -241,3 +241,76 @@ jobs:
           git add -f .ci-logs
           git commit -m "ci: 第 ${{ github.run_number }} 次构建日志"
           git push -f origin ci-logs
+
+  # ==========================================================================
+  # Swift 版探针：绕开 .NET 的 iOS 工具链，直接用 swiftc + AVFoundation
+  # 回答"Apple 的音频栈能不能解码 24bit/96kHz FLAC"。
+  # 同一个程序跑两遍：macOS 原生（同一套 CoreAudio）和 iOS 模拟器（真 iOS 运行时）。
+  # 推到独立分支 ci-logs-swift，避免和上面的作业抢同一个分支。
+  # ==========================================================================
+  flac-probe:
+    runs-on: macos-26
+    permissions:
+      contents: write
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: macOS 原生运行
+        run: |
+          set -uo pipefail
+          echo "SWIFT: $(swift --version 2>&1 | head -2)"
+          swiftc -O spikes/FlacProbe/main.swift -o flacprobe 2>&1 | tee swift-build-macos.log
+          if [ -x ./flacprobe ]; then
+            ./flacprobe spikes/IosProbe/Resources/Raw/sample-24bit96k.flac 2>&1 | tee flac-macos.txt
+          else
+            echo "(macOS 版没编译出来)" | tee flac-macos.txt
+          fi
+
+      - name: iOS 模拟器运行
+        run: |
+          set -uo pipefail
+          APP=FlacProbe.app
+          rm -rf "$APP" || true
+          mkdir -p "$APP"
+          cp spikes/FlacProbe/Info.plist "$APP/Info.plist"
+          cp spikes/IosProbe/Resources/Raw/sample-24bit96k.flac "$APP/sample-24bit96k.flac"
+
+          # 手工搓一个最小 .app：不需要 Xcode 工程，也就不碰 actool
+          xcrun --sdk iphonesimulator swiftc \
+            -target arm64-apple-ios16.0-simulator \
+            -o "$APP/FlacProbe" \
+            spikes/FlacProbe/main.swift \
+            -framework AVFoundation -framework Foundation 2>&1 | tee swift-build-ios.log
+
+          if [ ! -x "$APP/FlacProbe" ]; then
+            echo "(iOS 版没编译出来，看 swift-build-ios.log)" | tee flac-ios.txt
+            exit 0
+          fi
+
+          DEVICE_ID=$(xcrun simctl list devices available -j \
+            | jq -r 'first(.devices[] | .[] | select(.name | test("iPhone")) | .udid)')
+          echo "模拟器 = $DEVICE_ID"
+          xcrun simctl boot "$DEVICE_ID" || true
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          xcrun simctl install "$DEVICE_ID" "$APP"
+          xcrun simctl launch --console-pty "$DEVICE_ID" com.xszoz.flacprobe 2>&1 | tee flac-ios.txt || true
+
+      - name: 推送结果到 ci-logs-swift
+        if: always()
+        run: |
+          set -uo pipefail
+          mkdir -p .ci-logs
+          for f in flac-macos.txt flac-ios.txt swift-build-macos.log swift-build-ios.log; do
+            cp "$f" ".ci-logs/$f" 2>/dev/null || echo "(没有 $f)" > ".ci-logs/$f"
+          done
+          echo "run_number: ${{ github.run_number }}" > .ci-logs/meta.txt
+          echo "sha: $GITHUB_SHA" >> .ci-logs/meta.txt
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B ci-logs-swift
+          git add -f .ci-logs
+          git commit -m "ci: 第 ${{ github.run_number }} 次 FLAC 探针结果"
+          git push -f origin ci-logs-swift
