@@ -1102,6 +1102,9 @@ public sealed class PlaybackController
     private readonly PlaybackQueue _queue = new();
     private readonly IAudioPlayer _player;
     private int _failedAttempts;
+    private bool _isTryingCurrent;
+    private bool _loadFailed;
+    private string _failureMessage = string.Empty;
 
     public PlaybackController(IAudioPlayer player)
     {
@@ -1143,13 +1146,12 @@ public sealed class PlaybackController
             return false;
         }
 
-        StartCurrent();
-        return true;
+        return TryPlayCurrentSkippingBrokenFiles();
     }
 
-    public bool Next() => _queue.MoveNext() && StartCurrent();
+    public bool Next() => _queue.MoveNext() && TryPlayCurrentSkippingBrokenFiles();
 
-    public bool Previous() => _queue.MovePrevious() && StartCurrent();
+    public bool Previous() => _queue.MovePrevious() && TryPlayCurrentSkippingBrokenFiles();
 
     public void TogglePlayPause()
     {
@@ -1179,18 +1181,47 @@ public sealed class PlaybackController
         _player.Seek(clamped);
     }
 
-    private bool StartCurrent()
+    /// <summary>
+    /// 从当前曲目开始播放，遇到播不了的就往下一首走，直到播成功或整个队列都试完。
+    /// 必须是循环而不是递归：Load 可能同步回调 OnFailed，递归会在每一层都补一次 Play()，
+    /// 既多播一次，也会把已经放弃时设置好的 Stopped 状态又改回 Playing。
+    /// </summary>
+    private bool TryPlayCurrentSkippingBrokenFiles()
     {
-        var track = _queue.Current;
-        if (track is null)
+        _isTryingCurrent = true;
+        try
         {
+            while (_queue.Current is not null)
+            {
+                _loadFailed = false;
+                _player.Load(_queue.Current.FilePath);
+
+                if (!_loadFailed)
+                {
+                    _player.Play();
+                    _failedAttempts = 0;
+                    StateChanged?.Invoke(this, EventArgs.Empty);
+                    return true;
+                }
+
+                _failedAttempts++;
+
+                // 整个队列都试过一遍还是不行，就停下来告诉用户，不要无限重试
+                if (_failedAttempts >= _queue.Tracks.Count || !_queue.MoveNext())
+                {
+                    _player.Stop();
+                    PlaybackFailed?.Invoke(this, $"这个列表里的歌都播不了：{_failureMessage}");
+                    StateChanged?.Invoke(this, EventArgs.Empty);
+                    return false;
+                }
+            }
+
             return false;
         }
-
-        _player.Load(track.FilePath);
-        _player.Play();
-        StateChanged?.Invoke(this, EventArgs.Empty);
-        return true;
+        finally
+        {
+            _isTryingCurrent = false;
+        }
     }
 
     private void OnEnded(object? sender, EventArgs e)
@@ -1206,24 +1237,26 @@ public sealed class PlaybackController
 
     private void OnFailed(object? sender, string message)
     {
-        _failedAttempts++;
-        StateChanged?.Invoke(this, EventArgs.Empty);
+        _failureMessage = message;
 
-        // 整个队列都试过一遍还是不行，就停下来告诉用户，不要无限重试
-        if (_failedAttempts >= _queue.Tracks.Count)
+        // Load 期间的同步失败：交给正在跑的 TryPlayCurrentSkippingBrokenFiles 循环处理
+        if (_isTryingCurrent)
+        {
+            _loadFailed = true;
+            return;
+        }
+
+        // 播放中途才失败（例如文件被删掉）：走同一条跳过逻辑
+        _failedAttempts++;
+        if (_failedAttempts >= _queue.Tracks.Count || !_queue.MoveNext())
         {
             _player.Stop();
-            PlaybackFailed?.Invoke(this, $"这个列表里的歌都播不了：{message}");
+            PlaybackFailed?.Invoke(this, $"这个列表里的歌都播不了：{_failureMessage}");
+            StateChanged?.Invoke(this, EventArgs.Empty);
             return;
         }
 
-        if (Next())
-        {
-            return;
-        }
-
-        _player.Stop();
-        PlaybackFailed?.Invoke(this, message);
+        TryPlayCurrentSkippingBrokenFiles();
     }
 }
 ```
